@@ -1,10 +1,27 @@
 from scipy.linalg import block_diag
 from scipy import special
-from scipy.optimize import least_squares
 import numpy as np
 import numpy.matlib
+
 def pois_eq(x, q):
     return special.polygamma(1, x)-q
+
+def pois_eq_solver(x, q):
+# =============================================================================
+#     x = 1/qt[0, t]
+#     q = qt[0, t]
+# =============================================================================
+    f_org = special.polygamma(1, x)-q
+    Df = special.polygamma(2, x)
+    
+    x_new = x - f_org / Df
+    while (abs(x/x_new-1)>=1e-5):
+            x = x_new
+            f_org = special.polygamma(1, x)-q
+            Df = special.polygamma(2, x)
+            x_new = x - f_org / Df
+    return x_new
+
 def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_shift):
    
     # Incorporate Random effect: change F, G, delta, mt, Ct, at, Rt
@@ -60,8 +77,8 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
                 mt[:,t] = mt[:,t-1]
                 Ct[:,:,t] = Ct[:,:,t-1]
 
-                rt[t] = rt[t-1]
-                ct[t] = ct[t-1]
+                rt[:, t] = rt[:, t-1]
+                ct[:, t] = ct[:, t-1]
             
             skipped[:,t] = True
         # Update
@@ -81,8 +98,14 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
             qt[:, t]  = qt[:, t] + Rt[0,0,t] # % p.31 qt + vt. to revisit param
             
             # Get numerical root of Gamma approximation
-            rnew = least_squares(pois_eq, 1, args = (qt[:, t]), bounds = ((0), (1e16)))
-            rt[:, t] = rnew.x
+# =============================================================================
+#             rnew = least_squares(pois_eq, 1, args = (qt[:, t]), bounds = ((0), (1e16)))
+#             rt[:, t] = rnew.x
+#             ct[:, t] = np.exp(special.polygamma(0, rt[:, t])-ft[:, t])
+# =============================================================================
+            
+            
+            rt[:, t] = pois_eq_solver(1/qt[0, t], qt[0, t])
             ct[:, t] = np.exp(special.polygamma(0, rt[:, t])-ft[:, t])
             
             
@@ -139,9 +162,14 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped):
         # fprintf('t = %d, ssft = %.2f, ssqt = %.2f\n', t, ssft(t), ssqt(t));
         
         # Get numerical root of Gamma approximation
-        rnew = least_squares(pois_eq, 1, args = (ssqt[:, t]), bounds = ((0), (1e16)))
-        ssrt[:, t] = rnew.x
-        ssct[:, t] = np.exp(special.polygamma(0, ssrt[:, t])-ssft[:,t])
+# =============================================================================
+#         rnew = least_squares(pois_eq, 1, args = (ssqt[:, t]), bounds = ((0), (1e16)))
+#         ssrt[:, t] = rnew.x
+#         ssct[:, t] = np.exp(special.polygamma(0, ssrt[:, t])-ssft[:,t])
+# =============================================================================
+        ssrt[:, t] = pois_eq_solver(1/ssqt[0, t], ssqt[0, t])
+        ssct[:, t] = np.exp(special.polygamma(0, ssrt[:, t])-ssft[:, t])
+    
     return sat, sRt, ssrt, ssct
 
 

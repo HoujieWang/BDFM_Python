@@ -9,7 +9,7 @@ Created on Sun Jan 29 15:08:52 2023
 import ast
 import os
 import numpy as np
-
+import time
 # Prepare Data
 full_data = PrepareData('flow.csv', 'occ.csv', 0.20)
 locals().update(full_data)
@@ -53,61 +53,78 @@ ssst_pois_all = np.zeros((TActual, N))
 
 # Get sample of phi
 for n in range(N):
-    # n = 1
+    # n = 0
+    print(n)
     # Bern: Forward Filtering
     mN = m[:,np.where(categories == flowIndex[n,0])[0]]
-    mt_bern, Ct_bern, at_bern, Rt_bern, rt_bern, st_bern, skipped_bern = FF_Bernoulli(F_bern, G_bern, delta_bern, flow, n, T0, TActual, eps)
-    # Bern: Retrospective Analysis
-    [sat_bern, sRt_bern, ssrt_bern, ssst_bern] = RA_Bernoulli(TActual, F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern, skipped_bern)
+    
+    st = time.time()
+    mt_bern, Ct_bern, at_bern, Rt_bern, rt_bern, st_bern, skipped_bern = \
+    FF_Bernoulli(F_bern, G_bern, delta_bern, flow, n, T0, TActual, eps)
+    ed = time.time()
+    ed - st
 
+    # Bern: Retrospective Analysis
+    st = time.time()
+    [sat_bern, sRt_bern, ssrt_bern, ssst_bern] = \
+        RA_Bernoulli(TActual, F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern, skipped_bern)
+    ed = time.time()
+    ed - st
+    
     # Forward Filtering
-    [mt_pois, Ct_pois, at_pois, Rt_pois, rt_pois, ct_pois, skipped_pois] = FF_Poisson(F_pois, G_pois, delta_pois, flow, n, mN, T0, TActual, eps, RE_rho_pois, conditional_shift_pois)
+    st = time.time()
+    [mt_pois, Ct_pois, at_pois, Rt_pois, rt_pois, ct_pois, skipped_pois] = \
+        FF_Poisson(F_pois, G_pois, delta_pois, flow, n, mN, T0, TActual, \
+                   eps, RE_rho_pois, conditional_shift_pois)
+    ed = time.time()
+    ed - st
+    
     # Retrospective Analysis
-    [sat_pois, sRt_pois, ssrt_pois, ssct_pois] = RA_Poisson(TActual, F_pois, G_pois, mt_pois, Ct_pois, at_pois, Rt_pois, skipped_pois);
+    [sat_pois, sRt_pois, ssrt_pois, ssct_pois] = \
+        RA_Poisson(TActual, F_pois, G_pois, mt_pois, \
+                   Ct_pois, at_pois, Rt_pois, skipped_pois)
     
     # Store them
-    rt_bern_all(:, n) = rt_bern;
-    st_bern_all(:, n) = st_bern;
-    rt_pois_all(:, n) = rt_pois;
-    st_pois_all(:, n) = ct_pois;
+    rt_bern_all[:, n] = rt_bern
+    st_bern_all[:, n] = st_bern
+    rt_pois_all[:, n] = rt_pois
+    st_pois_all[:, n] = ct_pois
 
-    ssrt_bern_all(:, n) = ssrt_bern;
-    ssst_bern_all(:, n) = ssst_bern;
-    ssrt_pois_all(:, n) = ssrt_pois;
-    ssst_pois_all(:, n) = ssct_pois;
-
-    disp(n)
-end
-
-% Decompose fitted data
-[fEst, fUpper, fLower, aiEst, aiUpper, aiLower, bjEst, bjUpper, bjLower, ...
-    gijEst, gijUpper, gijLower] = ...
-    Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all,...
-    conditional_shift_pois, ...
-    TActual, flowIndex, categories, 1000, I, N);
-
-save('Output/Result_DGM_seq.mat', ...
-    'fEst', 'fUpper', 'fLower', 'aiEst', 'aiUpper', 'aiLower', 'bjEst', ...
-    'bjUpper', 'bjLower', ...
-    'gijEst', 'gijUpper', 'gijLower')
+    ssrt_bern_all[:, n] = ssrt_bern
+    ssst_bern_all[:, n] = ssst_bern
+    ssrt_pois_all[:, n] = ssrt_pois
+    ssst_pois_all[:, n] = ssct_pois
 
 
-[fEst_r, fUpper_r, fLower_r, aiEst_r, aiUpper_r, aiLower_r, bjEst_r, bjUpper_r, bjLower_r, ...
-    gijEst_r, gijUpper_r, gijLower_r] = ...
-    Recouple_DGM2(ssrt_bern_all, ssst_bern_all, ssrt_pois_all, ssst_pois_all,...
-    conditional_shift_pois, ...
+# Decompose fitted data
+fEst, fUpper, fLower, aiEst, aiUpper, aiLower, bjEst, bjUpper, bjLower, \
+    gijEst, gijUpper, gijLower = \
+    Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all,\
+    conditional_shift_pois, \
+    TActual, flowIndex, categories, 1000, I, N)
+
+# save('Output/Result_DGM_seq.mat', ...
+#     'fEst', 'fUpper', 'fLower', 'aiEst', 'aiUpper', 'aiLower', 'bjEst', ...
+#     'bjUpper', 'bjLower', ...
+#     'gijEst', 'gijUpper', 'gijLower')
+
+
+fEst_r, fUpper_r, fLower_r, aiEst_r, aiUpper_r, aiLower_r, bjEst_r, bjUpper_r, bjLower_r, \
+    gijEst_r, gijUpper_r, gijLower_r = \
+    Recouple_DGM2(ssrt_bern_all, ssst_bern_all, ssrt_pois_all, ssst_pois_all,\
+    conditional_shift_pois, \
     TActual, flowIndex, categories, 2000, I, N);
 
-save('Output/Result_DGM_retro.mat', ...
-    'fEst_r', 'fUpper_r', 'fLower_r', ...
-    'aiEst_r', 'aiUpper_r', 'aiLower_r', 'bjEst_r', ...
-    'bjUpper_r', 'bjLower_r', ...
-    'gijEst_r', 'gijUpper_r', 'gijLower_r')
+# save('Output/Result_DGM_retro.mat', ...
+#     'fEst_r', 'fUpper_r', 'fLower_r', ...
+#     'aiEst_r', 'aiUpper_r', 'aiLower_r', 'bjEst_r', ...
+#     'bjUpper_r', 'bjLower_r', ...
+#     'gijEst_r', 'gijUpper_r', 'gijLower_r')
 
-% Get empirical decomposition
-[mEf, mEai, mEbj, mEgij] = EmpiricalDecomp(flow, flowIndex, categories,...
-    m, N, I, TActual, T0, eps);
+# Get empirical decomposition
+mEf, mEai, mEbj, mEgij = EmpiricalDecomp(flow, flowIndex, categories,\
+    m, N, I, TActual, T0, eps)
 
-save('Output/Result_DGM_empirical.mat', ...
-    'mEf', 'mEai', 'mEbj', 'mEgij')
+# save('Output/Result_DGM_empirical.mat', ...
+#     'mEf', 'mEai', 'mEbj', 'mEgij')
 

@@ -1,9 +1,31 @@
 import numpy as np
 from scipy import special
-from scipy.optimize import least_squares
+
 def bern_eq(x, f, q):
     return np.concatenate([special.polygamma(0, x[0]) - special.polygamma(0, x[1])-f, 
 special.polygamma(1, x[0]) + special.polygamma(1, x[1])-q])
+
+def bern_eq_solver(x, f, q):
+# =============================================================================
+#     x = np.array([1/qt[0, t], 1/qt[0, t]]).reshape(2,1)
+#     f = ft[0, t]
+#     q = qt[0, t]
+# =============================================================================
+    f_org = np.array([[special.polygamma(0, x[0,0]) - special.polygamma(0, x[1,0])-f], 
+                  [special.polygamma(1, x[0,0]) + special.polygamma(1, x[1,0])-q]])
+    Df = np.array([[special.polygamma(1, x[0,0]), -special.polygamma(1, x[1,0])],
+                   [special.polygamma(2, x[0,0]), special.polygamma(2, x[1,0])]])
+    
+    x_new = x - np.linalg.inv(Df) @ f_org
+    while (abs(x[0]/x_new[0]-1)>=1e-5 and abs(x[1]/x_new[1]-1)>=1e-5):
+            x = x_new
+            f_org = np.array([[special.polygamma(0, x[0,0]) - special.polygamma(0, x[1,0])-f], 
+                          [special.polygamma(1, x[0,0]) + special.polygamma(1, x[1,0])-q]])
+            Df = np.array([[special.polygamma(1, x[0,0]), -special.polygamma(1, x[1,0])],
+                           [special.polygamma(2, x[0,0]), special.polygamma(2, x[1,0])]])
+            x_new = x - np.linalg.inv(Df) @ f_org
+    return x_new[0, 0], x_new[1, 0]
+
     
 def FF_Bernoulli(F, G, delta, flow, n, T0, TActual, eps):
     # F = F_bern; G = G_bern; delta = delta_bern; 
@@ -26,11 +48,11 @@ def FF_Bernoulli(F, G, delta, flow, n, T0, TActual, eps):
     C0 = 0.1*np.eye(2)
     
     # Transform
-    zt = np.array(flow[(n-1): n, :] > eps)
+    zt = np.array(flow[n: (n+1), :] > eps)
 
     # Forward filtering: Bernoulli
     for t in range(TActual):
-        # t = 14
+        # t = 0
         # When t = 1. Get prior from m0, C0
         if t == 0: 
             at[:, t]   = (G @ m0)[:,0]
@@ -55,10 +77,14 @@ def FF_Bernoulli(F, G, delta, flow, n, T0, TActual, eps):
         qt[:, t]     = Rt[0,0,t] * F.T @ F
         
         # Numerically approximate rt, st
-        xnew = least_squares(bern_eq, [1, 1],args = (ft[:, t], qt[:, t]), bounds = ((0, 0), (1e16, 1e16)))
-        # xnew = np.exp(fsolve(bern_eq, [1, 1], args = (ft[:, t], qt[:, t])))
-        rt[:, t] = xnew.x[0]
-        st[:, t] = xnew.x[1]
+# =============================================================================
+#         xnew = least_squares(bern_eq, [1, 1],args = (ft[:, t], qt[:, t]), bounds = ((0, 0), (1e16, 1e16)))
+#         rt[:, t] = xnew.x[0]
+#         st[:, t] = xnew.x[1]
+# =============================================================================
+        
+        rt[0, t], st[0, t] = bern_eq_solver(np.array([[1/qt[0, t]], [1/qt[0, t]]]),
+                       ft[0, t], qt[0, t])
         
         # Update ft, qt
         sft[:, t] = special.polygamma(0, rt[:, t] + zt[:, T0+t]) - special.polygamma(0, st[:, t] + 1 - zt[:, T0+t])
@@ -107,8 +133,14 @@ def RA_Bernoulli(TActual, F, G, mt, Ct, at, Rt, skipped):
         # fprintf('t = %d, ssft = %.2f, ssqt = %.2f\n', t, ssft(t), ssqt(t));
         
         # Numerically approximate rt, st
-        xnew = least_squares(bern_eq, [1, 1],args = (ssft[:, t], ssqt[:, t]), bounds = ((0, 0), (1e16, 1e16)))
-        ssrt[:,t]  = xnew.x[0]
-        ssst[:,t]  = xnew.x[1]
-    
+# =============================================================================
+#         xnew = least_squares(bern_eq, [1, 1],args = (ssft[:, t], ssqt[:, t]), bounds = ((0, 0), (1e16, 1e16)))
+#         ssrt[:,t]  = xnew.x[0]
+#         ssst[:,t]  = xnew.x[1]
+# =============================================================================
+        
+        ssrt[0, t], ssst[0, t] = bern_eq_solver(np.array([[1/ssqt[0, t]], [1/ssqt[0, t]]]),
+                       ssft[0, t], ssqt[0, t])
+        
+        
     return sat, sRt, ssrt, ssst
