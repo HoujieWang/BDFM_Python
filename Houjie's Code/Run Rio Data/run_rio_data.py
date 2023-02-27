@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import geopandas as gpd
 from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
@@ -7,7 +8,14 @@ from datetime import datetime
 import time
 import matplotlib.pyplot as plt
 import matplotlib.dates
+import matplotlib.colors as mcolors
+from Poisson import FF_Poisson, RA_Poisson
+from Bernoulli import FF_Bernoulli, RA_Bernoulli
+from Recouple_DGM2 import Recouple_DGM2
 #### Load Rio bus data and shapfile 
+
+os.chdir('/Users/wanghoujie/Downloads/DynamicNetwork/bus_gps_data')
+
 busData = pd.read_csv('treatedBusDataOnlyRoute.csv')
 sf = gpd.read_file('data/33MUE250GC_SIR.shp')
 rio = sf[sf.ID == 1535] # ID of the city of Rio
@@ -15,7 +23,7 @@ rio = sf[sf.ID == 1535] # ID of the city of Rio
 
 # Generate spatial grid points
 rio_bounds = np.array(rio.bounds).reshape(4,)
-cell_size = 0.08 # grid cell size 
+cell_size = 0.025 # grid cell size 
 lon_coords = np.arange(rio_bounds[0], rio_bounds[2]+cell_size, cell_size) 
 lat_coords = np.arange(rio_bounds[1], rio_bounds[3]+cell_size, cell_size)
 rio_grid = np.array(np.meshgrid(lon_coords, lat_coords)).\
@@ -25,8 +33,9 @@ rio_grid = np.array(np.meshgrid(lon_coords, lat_coords)).\
 # Specify a specific bus line within a day
 all_bus_line = np.unique(busData.line)
 bus_date = '01-25-2019'; 
-sub_bus = busData[np.isin(np.array(busData.line), all_bus_line[0: 50]) &  \
-                  (busData.date == bus_date) \
+bus_date = ['01-25-2019', '01-26-2019']
+sub_bus = busData[np.isin(np.array(busData.line), all_bus_line[0: 30]) &  \
+                  np.isin(busData.date, bus_date) \
                     # & (busData.order == bus_order)
                     ]
 
@@ -36,8 +45,8 @@ bus_time = np.array([np.datetime64(datetime.strptime(t, '%m-%d-%Y%H:%M:%S')) \
 
 # Generate time grid points
 time_intl = '30min'
-time_grid = pd.date_range(bus_date, periods=49, freq=time_intl)
-time_grid = time_grid[(np.where(time_grid >= np.min(bus_time))[0][0]-1): len(time_grid)]
+time_grid = pd.date_range(bus_date[0], periods=49*len(bus_date), freq=time_intl)
+# time_grid = time_grid[(np.where(time_grid >= np.min(bus_time))[0][0]-1): len(time_grid)]
 
 bus_id = np.unique(sub_bus.order)
 bus_location = (np.zeros((len(bus_id), len(time_grid)-1))-1).astype("int")
@@ -110,6 +119,8 @@ for t in range(TActual):
         else:
             m[t, i] = out_flows[t+T0, i]/out_flows[t+T0-1, i]
 
+
+############################## Fitting DCMM ##################################
 
 
 eps = 1e-2
@@ -211,28 +222,101 @@ fEst_r, fUpper_r, fLower_r, aiEst_r, aiUpper_r, aiLower_r, bjEst_r, bjUpper_r, b
     gijEst_r, gijUpper_r, gijLower_r = \
     Recouple_DGM2(ssrt_bern_all, ssst_bern_all, ssrt_pois_all, ssst_pois_all,\
     conditional_shift_pois, \
-    TActual, unique_edges, unique_nodes, 2000, I, N);
-
-
-plot_time = np.array([x.time().isoformat() for x in time_grid[np.arange(1, TActual+1)]])
-f_plot = plt.plot(plot_time, fEst_r[0, :])
-plt.xticks(np.arange(np.min(plot_time), np.max(plot_time)))
-
-plt.plot(np.arange(TActual), fEst_r[0, :])
-plt.plot(aiEst_r.T)
-plt.plot(bjEst_r.T)
-plt.plot(gijEst_r.T)
+    TActual, unique_edges, unique_nodes, 1000, I, N);
 
 
 
+############################ Plotting the DGM parameters and map ############################
+# plot_time = np.array([x.time().isoformat() for x in time_grid[np.arange(1, TActual+1)]])
+time_grid
+plot_time = np.array([x.date().isoformat() + "\n" + x.time().isoformat() \
+                      for x in time_grid[np.arange(1, TActual+1)]])
+
+base_plot = plt.plot(plot_time, np.exp(fEst[0, :]))
+plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+plt.title("Baseline process")
+# plt.savefig('baseline.pdf')
+plt.show()
+
+# for i in range(aiEst_r.shape[0]):
+temp_idx = np.flip(np.argsort(np.mean(aiEst_r, axis=1))[np.arange(-5, 0)])
+# temp_idx = range(0, aiEst_r.shape[0])
+alpha_plot = plt.plot(plot_time, np.exp(aiEst_r[temp_idx, :]).T)
+plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+plt.title("outflow process (alpha_i)")
+lgd = plt.legend(labels=unique_nodes[temp_idx],
+           bbox_to_anchor=(1.04, 1), 
+           loc="upper left")
+# plt.savefig('outflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.show()
+# temp_idx = np.argsort(np.mean(bjEst_r, axis=1))[np.arange(-10, 0)]
+# temp_idx = range(0, bjEst_r.shape[0])
+beta_plot = plt.plot(plot_time, np.exp(bjEst_r[temp_idx, :]).T)
+plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+plt.title("inflow process (beta_j)")
+lgd = plt.legend(labels=unique_nodes[temp_idx],
+           bbox_to_anchor=(1.04, 1), 
+           loc="upper left")
+# plt.savefig('inflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.show()
 
 
 
 
+bus_plot = rio.plot(alpha=0.2)
+k = 0
+for i in np.unique(sub_bus['line']):
+    # i = 6
+    bus_tmp = sub_bus.loc[sub_bus['line'] == i, :]
+    xy_tmp = np.array(bus_tmp[['longitude', 'latitude']])
+    plt.plot(xy_tmp[:,0], xy_tmp[:,1], ".", markersize=0.01,\
+             color = list(mcolors.CSS4_COLORS.keys())[k])
+    k +=1
+    
+for i in range(rio_grid.shape[0]):
+    plt.vlines(x = rio_grid[i, 0], ymin = np.min(rio_grid[:, 1]), 
+                ymax =  np.max(rio_grid[:, 1]),
+            colors = 'grey', linewidth = 0.5)
+    plt.hlines(y = rio_grid[i, 1], xmin = np.min(rio_grid[:, 0]), 
+                xmax =  np.max(rio_grid[:, 0]),
+            colors = 'grey', linewidth = 0.5)
+
+for i in unique_nodes:
+    plt.text(rio_grid[i, 0]+cell_size*0.1, rio_grid[i, 1]+cell_size*0.1,\
+    str(i), size = 5)
+    
+
+for i in unique_nodes[temp_idx]:
+    plt.vlines(x = rio_grid[i, 0], 
+                ymin = rio_grid[i, 1], 
+                ymax = rio_grid[i, 1]+cell_size,
+            colors = 'red', linewidth = 1)
+    plt.vlines(x = rio_grid[i, 0]+cell_size, 
+                ymin = rio_grid[i, 1], 
+                ymax = rio_grid[(i+1), 1]+cell_size,
+            colors = 'red', linewidth = 1)
+    
+    plt.hlines(y = rio_grid[i, 1], 
+                xmin = rio_grid[i, 0], 
+                xmax = rio_grid[i, 0]+cell_size,
+            colors = 'red', linewidth = 1)
+    plt.hlines(y = rio_grid[i, 1]+cell_size, 
+                xmin = rio_grid[i, 0], 
+                xmax = rio_grid[i, 0]+cell_size,
+            colors = 'red', linewidth = 1)
+
+# bus_plot.set_title("Trajectory of four buses on 01/25/2019 (9am-5pm)")
+# plt.savefig('Rio_map.pdf')
+plt.show()
 
 
-
-
-
-
+temp_idx = np.flip(np.argsort(np.mean(gijEst_r, axis=1))[np.arange(-10, 0)])
+plt.plot(plot_time, np.exp(gijEst_r[temp_idx, :]).T)
+plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+lgd = plt.legend(labels=unique_edges[temp_idx, :],
+           bbox_to_anchor=(1.04, 1), 
+           loc="upper left")
+plt.title("affinity process (gamma_ij)")
+# plt.savefig('affinity.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.show()
 

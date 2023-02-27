@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin/>
+        <pubdate>20110101</pubdate>
+        <title>Municipal Boundaries: Rio de Janeiro, Brasil, 2010</title>
+        <edition>1</edition>
+        <geoform>vector digital data</geoform>
+        <pubinfo>
+          <pubplace/>
+          <publish>Instituto Brasileiro de Geografia e Estatística</publish>
+        </pubinfo>
+        <onlink>http://purl.stanford.edu/by999xv2399</onlink>
+        <lworkcit>
+          <citeinfo>
+            <origin/>
+            <pubdate>20110101</pubdate>
+            <title>Evolução da divisão territorial do Brasil 1872 - 2010</title>
+            <edition>1</edition>
+            <pubinfo>
+              <pubplace/>
+              <publish>Instituto Brasileiro de Geografia e Estatística</publish>
+            </pubinfo>
+          </citeinfo>
+        </lworkcit>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>This polygon shapefile contains the municipal boundaries for the state of Rio de Janeiro, Brazil, in 2010. Municipalities are subdivisions of Brazilian states. The seat of the municipal administration is a denominated city, with no consideration from the law about the population, area or facilities. The city has the same name of the municipality. Municipalities can be subdivided, only for administrative purposes, in districts (normally, new municipalities are formed from these districts). Other populated sites are villages, but with no legal effects or regulation. This layer is part of the Evolução da divisão territorial do Brasil 1872 - 2010 dataset, a collection of data representing the evolution of Brazilian states, municipalities and cities.</abstract>
+      <purpose>This dataset is intended for researchers, students, and policy makers for reference and mapping purposes, and may be used for basic applications such as viewing, querying, and map output production, or to provide a basemap to support graphical overlays and analysis with other spatial data.</purpose>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <sngdate>
+          <caldate>20101231</caldate>
+        </sngdate>
+      </timeinfo>
+      <current>ground condition</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>Unknown</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-44.889321</westbc>
+        <eastbc>-40.958519</eastbc>
+        <northbc>-20.763205</northbc>
+        <southbc>-23.368932</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>lcsh</themekt>
+        <themekey>Administrative and political divisions</themekey>
+        <themekey>Cities and towns</themekey>
+      </theme>
+      <theme>
+        <themekt>ISO 19115 Topic Categories</themekt>
+        <themekey>boundaries</themekey>
+      </theme>
+      <place>
+        <placekt>geonames</placekt>
+        <placekey>Rio de Janeiro (Brazil : State)</placekey>
+      </place>
+      <temporal>
+        <tempkt>None</tempkt>
+        <tempkey>2010</tempkey>
+      </temporal>
+    </keywords>
+    <accconst>None</accconst>
+    <useconst/>
+    <ptcontac>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>Instituto Brasileiro de Geografia e Estatística</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>physical</addrtype>
+          <city>Rio de Janeiro</city>
+          <country>BR</country>
+        </cntaddr>
+        <cntemail>ibge@ibge.gov.br</cntemail>
+      </cntinfo>
+    </ptcontac>
+    <datacred>Instituto Brasileiro de Geografia e Estatística. (2011). Municipal Boundaries: Rio de Janeiro, Brasil, 2010 IBGE. Available at: http://purl.stanford.edu/by999xv2399</datacred>
+    <native> Version 6.2 (Build 9200) ; Esri ArcGIS 10.4.1.5686</native>
+  </idinfo>
+  <spdoinfo>
+    <direct>Vector</direct>
+    <ptvctinf>
+      <sdtsterm>
+        <sdtstype>GT-polygon composed of chains</sdtstype>
+        <ptvctcnt>92</ptvctcnt>
+      </sdtsterm>
+    </ptvctinf>
+  </spdoinfo>
+  <eainfo>
+    <detailed>
+      <enttyp>
+        <enttypl>33MUE250GC_SIR</enttypl>
+      </enttyp>
+      <attr>
+        <attrlabl>FID</attrlabl>
+        <attrdef>Internal feature number.</attrdef>
+        <attrdefs>Esri</attrdefs>
+        <attrdomv>
+          <udom>Sequential unique whole numbers that are automatically generated.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Shape</attrlabl>
+        <attrdef>Feature geometry.</attrdef>
+        <attrdefs>Esri</attrdefs>
+        <attrdomv>
+          <udom>Coordinates defining the features.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>ID</attrlabl>
+      </attr>
+      <attr>
+        <attrlabl>CD_GEOCODM</attrlabl>
+      </attr>
+      <attr>
+        <attrlabl>NM_MUNICIP</attrlabl>
+      </attr>
+    </detailed>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>Stanford Geospatial Center</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>physical</addrtype>
+          <address>Branner Earth Sciences Library</address>
+          <address>Mitchell Building, 2nd Floor</address>
+          <address>397 Panama Mall</address>
+          <city>Stanford</city>
+          <state>California</state>
+          <postal>94305</postal>
+        </cntaddr>
+        <cntvoice>650-723-2746</cntvoice>
+        <cntemail>brannerlibrary@stanford.edu</cntemail>
+      </cntinfo>
+    </distrib>
+    <distliab/>
+  </distinfo>
+  <metainfo>
+    <metd>20170901</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>Stanford Geospatial Center</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>physical</addrtype>
+          <address>Branner Earth Sciences Library</address>
+          <address>Mitchell Building, 2nd Floor</address>
+          <address>397 Panama Mall</address>
+          <city>Stanford</city>
+          <state>California</state>
+          <postal>94305</postal>
+        </cntaddr>
+        <cntvoice>650-723-2746</cntvoice>
+        <cntemail>brannerlibrary@stanford.edu</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+    <mettc>local time</mettc>
+  </metainfo>
+</metadata>
