@@ -23,7 +23,7 @@ rio = sf[sf.ID == 1535] # ID of the city of Rio
 
 # Generate spatial grid points
 rio_bounds = np.array(rio.bounds).reshape(4,)
-cell_size = 0.025 # grid cell size 
+cell_size = 0.05 # grid cell size 
 lon_coords = np.arange(rio_bounds[0], rio_bounds[2]+cell_size, cell_size) 
 lat_coords = np.arange(rio_bounds[1], rio_bounds[3]+cell_size, cell_size)
 rio_grid = np.array(np.meshgrid(lon_coords, lat_coords)).\
@@ -212,36 +212,36 @@ for n in range(N):
 
 # Decompose fitted data
 fEst, fUpper, fLower, aiEst, aiUpper, aiLower, bjEst, bjUpper, bjLower, \
-    gijEst, gijUpper, gijLower = \
+    gijEst, gijUpper, gijLower, fEst_exp, aiEst_exp, bjEst_exp, gijEst_exp= \
     Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all,\
     conditional_shift_pois, \
     TActual, unique_edges, unique_nodes, 1000, I, N)
 
 
 fEst_r, fUpper_r, fLower_r, aiEst_r, aiUpper_r, aiLower_r, bjEst_r, bjUpper_r, bjLower_r, \
-    gijEst_r, gijUpper_r, gijLower_r = \
+    gijEst_r, gijUpper_r, gijLower_r, fEst_exp_r, aiEst_exp_r, bjEst_exp_r, gijEst_exp_r= \
     Recouple_DGM2(ssrt_bern_all, ssst_bern_all, ssrt_pois_all, ssst_pois_all,\
     conditional_shift_pois, \
-    TActual, unique_edges, unique_nodes, 1000, I, N);
+    TActual, unique_edges, unique_nodes, 6000, I, N);
 
 
 
 ############################ Plotting the DGM parameters and map ############################
 # plot_time = np.array([x.time().isoformat() for x in time_grid[np.arange(1, TActual+1)]])
-time_grid
+
 plot_time = np.array([x.date().isoformat() + "\n" + x.time().isoformat() \
                       for x in time_grid[np.arange(1, TActual+1)]])
 
-base_plot = plt.plot(plot_time, np.exp(fEst[0, :]))
+base_plot = plt.plot(plot_time, np.exp(fEst_exp_r[0, :]))
 plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
 plt.title("Baseline process")
 # plt.savefig('baseline.pdf')
 plt.show()
 
 # for i in range(aiEst_r.shape[0]):
-temp_idx = np.flip(np.argsort(np.mean(aiEst_r, axis=1))[np.arange(-5, 0)])
+temp_idx = np.flip(np.argsort(np.mean(aiEst_exp_r, axis=1))[np.arange(-5, 0)])
 # temp_idx = range(0, aiEst_r.shape[0])
-alpha_plot = plt.plot(plot_time, np.exp(aiEst_r[temp_idx, :]).T)
+alpha_plot = plt.plot(plot_time, (aiEst_exp_r[temp_idx, :]).T)
 plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
 plt.title("outflow process (alpha_i)")
 lgd = plt.legend(labels=unique_nodes[temp_idx],
@@ -251,13 +251,13 @@ lgd = plt.legend(labels=unique_nodes[temp_idx],
 plt.show()
 # temp_idx = np.argsort(np.mean(bjEst_r, axis=1))[np.arange(-10, 0)]
 # temp_idx = range(0, bjEst_r.shape[0])
-beta_plot = plt.plot(plot_time, np.exp(bjEst_r[temp_idx, :]).T)
+beta_plot = plt.plot(plot_time, bjEst_exp_r[temp_idx, :].T)
 plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
 plt.title("inflow process (beta_j)")
 lgd = plt.legend(labels=unique_nodes[temp_idx],
            bbox_to_anchor=(1.04, 1), 
            loc="upper left")
-# plt.savefig('inflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.savefig('inflow_2.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
 plt.show()
 
 
@@ -310,8 +310,8 @@ for i in unique_nodes[temp_idx]:
 plt.show()
 
 
-temp_idx = np.flip(np.argsort(np.mean(gijEst_r, axis=1))[np.arange(-10, 0)])
-plt.plot(plot_time, np.exp(gijEst_r[temp_idx, :]).T)
+temp_idx = np.flip(np.argsort(np.mean(gijEst_exp_r, axis=1))[np.arange(-5, 0)])
+plt.plot(plot_time, gijEst_exp_r[temp_idx, :].T)
 plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
 lgd = plt.legend(labels=unique_edges[temp_idx, :],
            bbox_to_anchor=(1.04, 1), 

@@ -32,6 +32,12 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
     gijUpper = np.zeros((N, TActual))
     gijLower = np.zeros((N, TActual))
     
+    # Values in original scale
+    fEst_exp = np.zeros((1,TActual));
+    aiEst_exp = np.zeros((I,TActual));
+    bjEst_exp = np.zeros((I,TActual));
+    gijEst_exp = np.zeros((N,TActual));
+    
     for t in range(TActual):
         print("DGM:",t+1, "/", TActual, sep=(""))
         # t = 0
@@ -76,7 +82,10 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
                 mai[k, i] = np.sum(bsLogSample[find_i, k]) / I - mf[k, 0]
                 mbj[k, i] = np.sum(bsLogSample[find_j, k]) / I - mf[k, 0]
             
-        
+        fEst_exp[0, t] = np.mean(np.exp(mf[:, 0]))
+        aiEst_exp[:, t] = np.mean(np.exp(mai), axis= 0)
+        bjEst_exp[:, t] = np.mean(np.exp(mbj), axis= 0)
+        gijEst_exp[:, t] = np.mean(np.exp(mgij), axis= 0)
         
         # Get sample means, upper and lower bounds (colMeans)
         fEst[0, t] = np.mean(mf[:, 0])
@@ -111,19 +120,17 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
             
 
     # Values in original scale
-    # fEst_exp = zeros(1,TActual);
-    # aiEst_exp = zeros(I,TActual);
-    # bjEst_exp = zeros(I,TActual);
-    # gijEst_exp = zeros(N,TActual);
-    # for t = 1:TActual
-    #     fEst_exp(t) = mean(exp(mf(:,t)));
-    #     aiEst_exp(:,t) = mean(exp(mai(:,:,t)),1);
-    #     bjEst_exp(:,t) = mean(exp(mbj(:,:,t)),1);
-    #     gijEst_exp(:,t) = mean(exp(mgij(:,:,t)),1);
+    # fEst_exp = np.zeros((1,TActual));
+    # aiEst_exp = np.zeros((I,TActual));
+    # bjEst_exp = np.zeros((I,TActual));
+    # gijEst_exp = np.zeros((N,TActual));
+    # for t in range(TActual):
+    #     fEst_exp[0, t] = np.mean(np.exp(mf[:, 0]))
+    #     aiEst_exp[:, t] = np.mean(np.exp(mai), axis= 0)
+    #     bjEst_exp[:, t] = np.mean(np.exp(mbj), axis= 0)
+    #     gijEst_exp[:, t] = np.mean(np.exp(mgij), axis= 0)
         
-    #     disp(strcat('DGM Exp:', num2str(t), '/', num2str(TActual)))
-    # end
+    
     
     return fEst, fUpper, fLower, aiEst, aiUpper, aiLower, bjEst, bjUpper, bjLower, \
-        gijEst, gijUpper, gijLower
-
+        gijEst, gijUpper, gijLower, fEst_exp, aiEst_exp, bjEst_exp, gijEst_exp
