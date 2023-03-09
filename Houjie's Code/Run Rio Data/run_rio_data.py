@@ -1,3 +1,5 @@
+# Set Working Directory to "Houjies Code"
+
 import os
 import matplotlib.pyplot as plt
 import geopandas as gpd
@@ -9,15 +11,18 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.dates
 import matplotlib.colors as mcolors
+os.chdir("Utilities")
 from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
+from BK_functions import RA_Poisson_lambda
+os.chdir("..")
 #### Load Rio bus data and shapfile 
 
-os.chdir('/Users/wanghoujie/Downloads/DynamicNetwork/bus_gps_data')
-
-busData = pd.read_csv('treatedBusDataOnlyRoute.csv')
-sf = gpd.read_file('data/33MUE250GC_SIR.shp')
+#os.chdir('/Users/wanghoujie/Downloads/DynamicNetwork/bus_gps_data')
+busData = pd.read_csv('../../rio_buses/bus_gps_data/treatedBusDataOnlyRoute.csv')
+#busData = pd.read_csv('treatedBusDataOnlyRoute.csv')
+sf = gpd.read_file('Run Rio Data/RioShapeFile/33MUE250GC_SIR.shp')
 rio = sf[sf.ID == 1535] # ID of the city of Rio
 
 
@@ -31,7 +36,7 @@ rio_grid = np.array(np.meshgrid(lon_coords, lat_coords)).\
 
 
 # Specify a specific bus line within a day
-all_bus_line = np.unique(busData.line)
+all_bus_line = 	np.unique(busData.line)
 bus_date = '01-25-2019'; 
 bus_date = ['01-25-2019', '01-26-2019']
 sub_bus = busData[np.isin(np.array(busData.line), all_bus_line[0: 30]) &  \
@@ -224,7 +229,10 @@ fEst_r, fUpper_r, fLower_r, aiEst_r, aiUpper_r, aiLower_r, bjEst_r, bjUpper_r, b
     conditional_shift_pois, \
     TActual, unique_edges, unique_nodes, 6000, I, N);
 
+# BK Retrospective for Poisson lambda
 
+lambda_mean, lambda_lower, lambda_upper = RA_Poisson_lambda(rt_pois_all, \
+       st_pois_all, delta_pois, samps = 1000)
 
 ############################ Plotting the DGM parameters and map ############################
 # plot_time = np.array([x.time().isoformat() for x in time_grid[np.arange(1, TActual+1)]])
@@ -320,3 +328,12 @@ plt.title("affinity process (gamma_ij)")
 # plt.savefig('affinity.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
 plt.show()
 
+
+plt.plot(plot_time, lambda_mean[:, temp_idx])
+plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+lgd = plt.legend(labels=unique_edges[temp_idx, :],
+           bbox_to_anchor=(1.04, 1), 
+           loc="upper left")
+plt.title("Retrospective Poisson Lambda Means")
+# plt.savefig('affinity.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.show()
