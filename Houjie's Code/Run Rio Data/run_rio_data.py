@@ -15,7 +15,7 @@ os.chdir("Utilities")
 from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
-from BK_functions import RA_Poisson_lambda
+from BK_functions import RA_Poisson_lambda, RA_Bernoulli_p
 os.chdir("..")
 #### Load Rio bus data and shapfile 
 
@@ -233,6 +233,9 @@ fEst_r, fUpper_r, fLower_r, aiEst_r, aiUpper_r, aiLower_r, bjEst_r, bjUpper_r, b
 
 lambda_mean, lambda_lower, lambda_upper = RA_Poisson_lambda(rt_pois_all, \
        st_pois_all, delta_pois, samps = 1000)
+    
+p_mean, p_lower, p_upper = RA_Bernoulli_p(rt_bern_all, \
+       st_bern_all, delta_bern, samps = 1000)
 
 ############################ Plotting the DGM parameters and map ############################
 # plot_time = np.array([x.time().isoformat() for x in time_grid[np.arange(1, TActual+1)]])
@@ -337,3 +340,4 @@ lgd = plt.legend(labels=unique_edges[temp_idx, :],
 plt.title("Retrospective Poisson Lambda Means")
 # plt.savefig('affinity.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
 plt.show()
+

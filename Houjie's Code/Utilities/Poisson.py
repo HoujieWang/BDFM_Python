@@ -153,6 +153,9 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped):
         Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
         sat[:,t] = mt[:,t] - Bt @ (at[:,t+1] - sat[:,t+1])
         sRt[:,:,t] = Ct[:,:,t] - Bt @ (Rt[:,:,t+1] - sRt[:,:,t+1]) @ Bt.T
+        
+        #sim_sat[:,t] = mt[:,t] + Bt @ (sim_at[:,t+1] - at[:,t+1])
+        #sim_sRt[:,:,t] = Ct[:,:,t] - Bt @ (sim_Rt[:,:,t+1]) @ Bt.T
     
     # Approximate rt, ct
     # for t in np.arange(TActual-2, -1, -1):
