@@ -96,7 +96,7 @@ def FF_Bernoulli(F, G, delta, flow, n, T0, TActual, eps):
     
     return mt, Ct, at, Rt, rt, st, skipped
 
-def RA_Bernoulli(TActual, F, G, mt, Ct, at, Rt, skipped):
+def RA_Bernoulli(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     
     # F = F_bern; G = G_bern; mt = mt_bern; Ct = Ct_bern; at = at_bern; Rt = Rt_bern; skipped = skipped_bern;
     # Initialization
@@ -141,6 +141,10 @@ def RA_Bernoulli(TActual, F, G, mt, Ct, at, Rt, skipped):
         
         ssrt[0, t], ssst[0, t] = bern_eq_solver(np.array([[1/ssqt[0, t]], [1/ssqt[0, t]]]),
                        ssft[0, t], ssqt[0, t])
+    prob_sample = special.expit(np.random.normal(loc=ssft, \
+                                                 scale=np.sqrt(ssqt), \
+                                                 size=(nSample, ssft.shape[1])))
         
-        
-    return sat, sRt, ssrt, ssst
+    return sat, sRt, ssrt, ssst, prob_sample
+
+

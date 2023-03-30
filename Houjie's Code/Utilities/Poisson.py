@@ -109,8 +109,8 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
             ct[:, t] = np.exp(special.polygamma(0, rt[:, t])-ft[:, t])
             
             
-            sft[:, t] = special.polygamma(0, rt[:, t]+xt[T0+t]) - np.log(ct[:, t]+1)
-            # sft[:, t] = special.polygamma(0, rt[:, t]+xt[T0+t]) - np.log(ct[:, t]+mN[t:,0])
+            # sft[:, t] = special.polygamma(0, rt[:, t]+xt[T0+t]) - np.log(ct[:, t]+1)
+            sft[:, t] = special.polygamma(0, rt[:, t]+xt[T0+t]) - np.log(ct[:, t]+mN[t,0])
             sqt[:, t] = special.polygamma(1, rt[:, t]+xt[T0+t])
             mt[:,t] = at[:,t] + Rt[:,:,t] @ F @ (sft[:, t]-ft[:, t])/qt[:, t]
             Ct[:,:,t] = Rt[:,:,t]-Rt[:,:,t] @ F @ (F.T) @ Rt[:,:,t] * (1-sqt[:, t]/qt[:, t])/qt[:, t]
@@ -118,7 +118,7 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
 
 
 
-def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped):
+def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     
    
     # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; at = at_pois; Rt = Rt_pois; skipped = skipped_pois;
@@ -153,9 +153,6 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped):
         Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
         sat[:,t] = mt[:,t] - Bt @ (at[:,t+1] - sat[:,t+1])
         sRt[:,:,t] = Ct[:,:,t] - Bt @ (Rt[:,:,t+1] - sRt[:,:,t+1]) @ Bt.T
-        
-        #sim_sat[:,t] = mt[:,t] + Bt @ (sim_at[:,t+1] - at[:,t+1])
-        #sim_sRt[:,:,t] = Ct[:,:,t] - Bt @ (sim_Rt[:,:,t+1]) @ Bt.T
     
     # Approximate rt, ct
     # for t in np.arange(TActual-2, -1, -1):
@@ -172,14 +169,9 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped):
 # =============================================================================
         ssrt[:, t] = pois_eq_solver(1/ssqt[0, t], ssqt[0, t])
         ssct[:, t] = np.exp(special.polygamma(0, ssrt[:, t])-ssft[:, t])
+    rate_sample = np.exp(np.random.normal(loc=ssft, \
+                                          scale=np.sqrt(ssqt), \
+                                          size=(nSample, ssft.shape[1])))
     
-    return sat, sRt, ssrt, ssct
-
-
-
-
-
-
-
-
+    return sat, sRt, ssrt, ssct, rate_sample
 
