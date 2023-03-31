@@ -29,11 +29,13 @@ def bern_eq_solver(x, f, q):
     
 def FF_Bernoulli(F, G, delta, flow, n, T0, TActual, eps):
     # F = F_bern; G = G_bern; delta = delta_bern; 
+    # flow = flow_count
     # Initiate: Bernoulli
-    mt  = np.zeros((2,TActual))
-    Ct  = np.zeros((2,2,TActual))
-    at  = np.zeros((2,TActual))
-    Rt  = np.zeros((2,2,TActual))
+    d1, d2 = G.shape
+    mt  = np.zeros((d2,TActual))
+    Ct  = np.zeros((d2,d2,TActual))
+    at  = np.zeros((d1,TActual))
+    Rt  = np.zeros((d1,d1,TActual))
     rt  = np.zeros((1,TActual))
     st  = np.zeros((1,TActual))
     ft  = np.zeros((1,TActual+1))
@@ -43,9 +45,12 @@ def FF_Bernoulli(F, G, delta, flow, n, T0, TActual, eps):
     skipped = np.zeros((1,TActual))
     
     # Prior: Bernoulli
-    m0 = np.array([[0],
-                   [0]])
-    C0 = 0.1*np.eye(2)
+    # m0 = np.array([[0],
+    #                [0]])
+    # C0 = 0.1*np.eye(2)
+    
+    m0 = np.zeros((d2, 1))
+    C0 = 0.1*np.eye(d2)
     
     # Transform
     zt = np.array(flow[n: (n+1), :] > eps)
@@ -100,8 +105,9 @@ def RA_Bernoulli(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     
     # F = F_bern; G = G_bern; mt = mt_bern; Ct = Ct_bern; at = at_bern; Rt = Rt_bern; skipped = skipped_bern;
     # Initialization
-    sat = np.zeros((2,TActual))
-    sRt = np.zeros((2,2,TActual))
+    d1, d2 = G.shape
+    sat = np.zeros((d1,TActual))
+    sRt = np.zeros((d1,d1,TActual))
     ssft = np.zeros((1,TActual))
     ssqt = np.zeros((1,TActual))
     ssrt = np.zeros((1,TActual))

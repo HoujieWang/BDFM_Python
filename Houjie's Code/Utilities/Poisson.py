@@ -32,13 +32,14 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
     
     F = np.r_[np.array([[1]]), F]
     G = block_diag(0, G)
-    delta = np.diag(np.c_[np.array([RE_rho]), np.matlib.repmat(delta,1,2)][0,:])
-
+    d1, d2 = G.shape
+    delta = np.diag(np.c_[np.array([RE_rho]), np.matlib.repmat(delta,1,d2-1)][0,:])
+    
     # Initialize parameters
-    mt  = np.zeros((3,TActual))
-    Ct  = np.zeros((3,3,TActual))
-    at  = np.zeros((3,TActual))
-    Rt  = np.zeros((3,3,TActual))
+    mt  = np.zeros((d2,TActual))
+    Ct  = np.zeros((d2,d2,TActual))
+    at  = np.zeros((d1,TActual))
+    Rt  = np.zeros((d1,d1,TActual))
     rt  = np.zeros((1,TActual))
     ct  = np.zeros((1,TActual))
     ft  = np.zeros((1,TActual+1))
@@ -49,8 +50,13 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
     skipped = np.zeros((1, TActual))
 
     # Prior: Poisson
-    m0 = np.array([1, np.log(max(flow[n,T0-1],1)), 0]).reshape(3, 1)
-    C0 = 0.1 * np.eye(3)
+    # m0 = np.array([1, np.log(max(flow[n,T0-1],1)), 0]).reshape(d2, 1)
+    # C0 = 0.1 * np.eye(3)
+    
+    m0 = np.concatenate((np.array([1, np.log(max(flow[n,T0-1],1)), 0]), 
+                              np.zeros((d2-3, ))
+                              )).reshape(d2, 1)
+    C0 = 0.1 * np.eye(d2)
 
     # Retrieve up data series
     xt = flow[n, :]
@@ -121,16 +127,18 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
 def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     
    
-    # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; at = at_pois; Rt = Rt_pois; skipped = skipped_pois;
+    # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; 
+    # at = at_pois; Rt = Rt_pois; skipped = skipped_pois;
    
 
     # Change F, G and delta for random effect
     F = np.r_[np.array([[1]]), F]
     G = block_diag(0, G)
-
+    d1, d2 = G.shape
+    
     # Initialization
-    sat = np.zeros((3,TActual))
-    sRt = np.zeros((3,3,TActual))
+    sat = np.zeros((d1,TActual))
+    sRt = np.zeros((d1,d1,TActual))
     ssft = np.zeros((1,TActual))
     ssqt = np.zeros((1,TActual))
     ssrt = np.zeros((1,TActual))
@@ -142,21 +150,23 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     
     # Retrospective Analysis
     for t in np.arange(TActual-2, -1, -1):
-        # t = 361
+        # t = 380
         # Skipp the time points not updated
         if skipped[:,t+1]:
             sat[:,t] = sat[:,t+1]
             sRt[:,:,t] = sRt[:,:,t+1]
             continue
         
-        
         Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
         sat[:,t] = mt[:,t] - Bt @ (at[:,t+1] - sat[:,t+1])
         sRt[:,:,t] = Ct[:,:,t] - Bt @ (Rt[:,:,t+1] - sRt[:,:,t+1]) @ Bt.T
     
+    sRt[np.abs(sRt) < 1e-5] = 0
+        
     # Approximate rt, ct
     # for t in np.arange(TActual-2, -1, -1):
     for t in np.arange(-1, -TActual-1, -1):
+        # t = -TActual
         ssft[:,t]     = F.T @ sat[:,t]
         ssqt[:,t]     = F.T @ sRt[:,:,t] @ F
         # fprintf('t = %d, ssft = %.2f, ssqt = %.2f\n', t, ssft(t), ssqt(t));

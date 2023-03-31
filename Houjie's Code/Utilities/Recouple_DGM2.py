@@ -3,8 +3,7 @@ import numpy.random
 def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
     conditional_shift_pois, \
     TActual, flowIndex, categories, sampleSize, I, N):
-    # sampleSize = 1000
-    
+    # sampleSize = 2500
     # Sample
     mf = np.zeros((sampleSize,1))
     mai = np.zeros((sampleSize,I))
@@ -33,10 +32,34 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
     gijLower = np.zeros((N, TActual))
     
     # Values in original scale
-    fEst_exp = np.zeros((1,TActual));
-    aiEst_exp = np.zeros((I,TActual));
-    bjEst_exp = np.zeros((I,TActual));
-    gijEst_exp = np.zeros((N,TActual));
+    # fEst_exp = np.zeros((1,TActual));
+    # fUpper_exp = np.zeros((1,TActual))
+    # fLower_exp = np.zeros((1,TActual))
+    
+    
+    # aiEst_exp = np.zeros((I,TActual));
+    # aiUpper_exp = np.zeros((I, TActual))
+    # aiLower_exp = np.zeros((I, TActual))
+    
+    # bjEst_exp = np.zeros((I,TActual));
+    # bjUpper_exp = np.zeros((I, TActual))
+    # bjLower_exp = np.zeros((I, TActual))
+    
+    
+    # gijEst_exp = np.zeros((N,TActual))
+    # gijUpper_exp = np.zeros((N, TActual))
+    # gijLower_exp = np.zeros((N, TActual))
+    
+    MC_f = np.zeros((1, TActual))
+    MC_ai = np.zeros((I, TActual))
+    MC_bj = np.zeros((I, TActual))
+    MC_gij = np.zeros((N,TActual))
+    
+    # all_bsSample = np.zeros((N, sampleSize, TActual))
+    # all_mf = np.zeros((sampleSize, TActual))
+    # all_mai = np.zeros((sampleSize, I, TActual))
+    # all_mbj = np.zeros((sampleSize, I, TActual))
+    # all_mgij = np.zeros((sampleSize, N, TActual))
     
     for t in range(TActual):
         print("DGM:",t+1, "/", TActual, sep=(""))
@@ -69,7 +92,6 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
         
         
         bsLogSample = np.log(np.clip(bsSample, 1, 1e16))
-        
         # f_t, a_it, b_jt--------------       
         # Get sample
         for k in range(sampleSize):
@@ -81,24 +103,40 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
                 find_j = flowIndex[:, 1] == categories[i]
                 mai[k, i] = np.sum(bsLogSample[find_i, k]) / I - mf[k, 0]
                 mbj[k, i] = np.sum(bsLogSample[find_j, k]) / I - mf[k, 0]
-            
-        fEst_exp[0, t] = np.mean(np.exp(mf[:, 0]))
-        aiEst_exp[:, t] = np.mean(np.exp(mai), axis= 0)
-        bjEst_exp[:, t] = np.mean(np.exp(mbj), axis= 0)
-        gijEst_exp[:, t] = np.mean(np.exp(mgij), axis= 0)
+        
+        # all_bsSample[:,:, t] = bsSample
+        # all_mai[:,:, t] = mai
+        # all_mbj[:,:, t] = mbj
+        # all_mgij[:,:, t] = mgij
+    
+        # fEst_exp[0, t] = np.exp(np.mean(mf[:, 0]))
+        # fUpper_exp[0, t]   = np.quantile(np.exp(mf[:, 0]), 0.975)
+        # fLower_exp[0, t]   = np.quantile(np.exp(mf[:, 0]), 0.025)
+        
+        
+        # aiEst_exp[:, t] = np.mean(np.exp(mai), axis= 0)
+        # aiUpper_exp[:, t] = np.quantile(np.exp(mai), 0.975, axis = 0)
+        # aiLower_exp[:, t] = np.quantile(np.exp(mai), 0.025, axis = 0)
+        
+        
+        # bjEst_exp[:, t] = np.mean(np.exp(mbj), axis= 0)
+        # bjUpper_exp[:, t] = np.quantile(np.exp(mbj), 0.975, axis = 0)
+        # bjLower_exp[:, t] = np.quantile(np.exp(mbj), 0.025, axis = 0)
+        
+        
         
         # Get sample means, upper and lower bounds (colMeans)
-        fEst[0, t] = np.mean(mf[:, 0])
-        fUpper[0, t]   = np.quantile(mf[:, 0], 0.975)
-        fLower[0, t]   = np.quantile(mf[:, 0], 0.025)
+        fEst[0, t]     = np.exp(np.mean(mf[:, 0]))
+        fUpper[0, t]   = np.exp(np.quantile(mf[:, 0], 0.975))
+        fLower[0, t]   = np.exp(np.quantile(mf[:, 0], 0.025))
         
-        aiEst[:, t]   = np.mean(mai, axis= 0)
-        aiUpper[:, t] = np.quantile(mai, 0.975, axis = 0)
-        aiLower[:, t] = np.quantile(mai, 0.025, axis = 0)
+        aiEst[:, t]   = np.exp(np.mean(mai, axis= 0))
+        aiUpper[:, t] = np.exp(np.quantile(mai, 0.975, axis = 0))
+        aiLower[:, t] = np.exp(np.quantile(mai, 0.025, axis = 0))
         
-        bjEst[:, t]   = np.mean(mbj, axis= 0)
-        bjUpper[:, t] = np.quantile(mbj, 0.975, axis = 0)
-        bjLower[:, t] = np.quantile(mbj, 0.025, axis = 0)
+        bjEst[:, t]   = np.exp(np.mean(mbj, axis= 0))
+        bjUpper[:, t] = np.exp(np.quantile(mbj, 0.975, axis = 0))
+        bjLower[:, t] = np.exp(np.quantile(mbj, 0.025, axis = 0))
         
         # g_ijt --------------------
         # Get sample
@@ -113,12 +151,20 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
          
         
         # Get sample means, upper and lower bounds
-        
-        gijEst[:, t] = np.mean(mgij, axis= 0)
-        gijUpper[:, t] = np.quantile(mgij, 0.975, axis = 0)
-        gijLower[:, t] = np.quantile(mgij, 0.025, axis = 0)
+        gijEst[:, t]   = np.exp(np.mean(mgij, axis= 0))
+        gijUpper[:, t] = np.exp(np.quantile(mgij, 0.975, axis = 0))
+        gijLower[:, t] = np.exp(np.quantile(mgij, 0.025, axis = 0))
             
-
+        # gijEst_exp[:, t] = np.mean(np.exp(mgij), axis= 0)
+        # gijUpper_exp[:, t] = np.quantile(np.exp(mgij), 0.975, axis = 0)
+        # gijLower_exp[:, t] = np.quantile(np.exp(mgij), 0.025, axis = 0)
+        
+        tmp_idx = np.random.randint(0, sampleSize, size=1)[0]
+        MC_f[0, t] = np.exp(mf[tmp_idx, 0])
+        MC_ai[:, t] = np.exp(mai[tmp_idx, :])
+        MC_bj[:, t] = np.exp(mbj[tmp_idx, :])
+        MC_gij[:, t] = np.exp(mgij[tmp_idx, :])
+        
     # Values in original scale
     # fEst_exp = np.zeros((1,TActual));
     # aiEst_exp = np.zeros((I,TActual));
@@ -132,5 +178,12 @@ def Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all, \
         
     
     
-    return fEst, fUpper, fLower, aiEst, aiUpper, aiLower, bjEst, bjUpper, bjLower, \
-        gijEst, gijUpper, gijLower, fEst_exp, aiEst_exp, bjEst_exp, gijEst_exp
+    return fEst, fUpper, fLower, \
+            aiEst, aiUpper, aiLower, \
+            bjEst, bjUpper, bjLower, \
+            gijEst, gijUpper, gijLower,\
+            MC_f, MC_ai, MC_bj, MC_gij
+    # return fEst_exp, fUpper_exp, fLower_exp, aiEst_exp, aiUpper_exp, aiLower_exp, \
+    #         bjEst_exp, bjUpper_exp, bjLower_exp, gijEst_exp, gijUpper_exp, gijLower_exp, \
+    #         MC_f, MC_ai, MC_bj, MC_gij, \
+    #         all_bsSample, all_mf, all_mai, all_mbj, all_mgij
