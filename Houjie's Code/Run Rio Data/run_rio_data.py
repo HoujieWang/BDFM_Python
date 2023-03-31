@@ -1,29 +1,34 @@
-# Set Working Directory to "Houjies Code"
-
 import os
 import matplotlib.pyplot as plt
+import scipy.linalg
 import geopandas as gpd
 from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
 import numpy as np
 import pandas as pd
 from datetime import datetime
 import time
+import math
 import matplotlib.pyplot as plt
 import matplotlib.dates
 import matplotlib.colors as mcolors
-os.chdir("Utilities")
+
+import random
 from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
-from BK_functions import RA_Poisson_lambda, RA_Bernoulli_p
-os.chdir("..")
+from sklearn.preprocessing import normalize
 #### Load Rio bus data and shapfile 
 
-#os.chdir('/Users/wanghoujie/Downloads/DynamicNetwork/bus_gps_data')
-busData = pd.read_csv('../../rio_buses/bus_gps_data/treatedBusDataOnlyRoute.csv')
-#busData = pd.read_csv('treatedBusDataOnlyRoute.csv')
-sf = gpd.read_file('Run Rio Data/RioShapeFile/33MUE250GC_SIR.shp')
+os.chdir('/Users/wanghoujie/Downloads/DynamicNetwork/bus_gps_data')
+
+busData = pd.read_csv('treatedBusDataOnlyRoute.csv')
+busData['longitude'] = pd.to_numeric(busData.longitude, errors='coerce')
+busData['latitude'] = pd.to_numeric(busData.latitude, errors='coerce')
+
+
+sf = gpd.read_file('data/33MUE250GC_SIR.shp')
 rio = sf[sf.ID == 1535] # ID of the city of Rio
+
 
 
 # Generate spatial grid points
@@ -36,10 +41,16 @@ rio_grid = np.array(np.meshgrid(lon_coords, lat_coords)).\
 
 
 # Specify a specific bus line within a day
-all_bus_line = 	np.unique(busData.line)
-bus_date = '01-25-2019'; 
-bus_date = ['01-25-2019', '01-26-2019']
-sub_bus = busData[np.isin(np.array(busData.line), all_bus_line[0: 30]) &  \
+all_bus_line = np.unique(busData.line)
+# bus_date = '01-25-2019'; 
+# bus_date = ['01-25-2019', '01-26-2019']
+
+bus_subgrid = busData[(-43.3 <= busData.longitude) & (busData.longitude <= -43.2) & \
+    (-23 <= busData.latitude) & (busData.latitude <= -22.8)]
+busline_subgrid = np.unique(bus_subgrid.line)
+
+bus_date = pd.date_range('02-22-2019', periods=23, freq='24h').strftime('%m-%d-%Y')
+sub_bus = busData[np.isin(np.array(busData.line), busline_subgrid[0: 20]) &  \
                   np.isin(busData.date, bus_date) \
                     # & (busData.order == bus_order)
                     ]
@@ -49,14 +60,14 @@ bus_time = np.array([np.datetime64(datetime.strptime(t, '%m-%d-%Y%H:%M:%S')) \
                         for t in np.array(sub_bus.date) + np.array(sub_bus.time)])
 
 # Generate time grid points
-time_intl = '30min'
-time_grid = pd.date_range(bus_date[0], periods=49*len(bus_date), freq=time_intl)
+time_intl = '60min'
+time_grid = pd.date_range(bus_date[0], periods=24*1*len(bus_date), freq=time_intl)
 # time_grid = time_grid[(np.where(time_grid >= np.min(bus_time))[0][0]-1): len(time_grid)]
 
 bus_id = np.unique(sub_bus.order)
 bus_location = (np.zeros((len(bus_id), len(time_grid)-1))-1).astype("int")
 for i in range(len(time_grid)-1):
-    # i = 31
+    # i = 0
     print(i)
     t0 = time_grid[i]
     t1 = time_grid[i+1]
@@ -135,20 +146,40 @@ N = flow_count.shape[0]
 
 # Bernoulli
 
+# F_bern = np.array([[1],
+#                     [0]])
+# G_bern = np.array([[1, 1], 
+#                     [0, 1]])
 F_bern = np.array([[1],
-                   [0]])
-G_bern = np.array([[1, 1], 
-                   [0, 1]])
+                    [0],
+                    [1],
+                    [0]])
+
+period = 12
+G_bern = scipy.linalg.block_diag([[1, 1], 
+                                [0, 1]],
+                                [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
+                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
+
 delta_bern = 0.95  # Discount factor for evolution variance
 sampleSize_bern = 1000 # Sample size of posterior and predictions
 
 # Poisson
+# F_pois = np.array([[1],
+#                     [0]])
+# G_pois = np.array([[1, 1], 
+#                     [0, 1]])
 F_pois = np.array([[1],
-                   [0]])
-G_pois = np.array([[1, 1], 
-                   [0, 1]])
-delta_pois = 0.90  # Discount factor for evolution variance
-RE_rho_pois = 0.90 # Discount factor for random effect. When = 1, no RE
+                    [0],
+                    [1],
+                    [0]])
+G_pois = scipy.linalg.block_diag([[1, 1], 
+                                [0, 1]],
+                                [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
+                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
+
+delta_pois = 0.9  # Discount factor for evolution variance
+RE_rho_pois = 0.9 # Discount factor for random effect. When = 1, no RE
 conditional_shift_pois = 1 # Shift of conditional Poisson
 sampleSize_pois = 1000 # Sample size of posterior and predictions
 
@@ -167,8 +198,10 @@ ssst_bern_all = np.zeros((TActual, N))
 ssrt_pois_all = np.zeros((TActual, N))
 ssst_pois_all = np.zeros((TActual, N))
 
-
-# Get sample of phi
+nSample = 1000
+pois_sample = np.zeros((nSample, TActual, N))
+bern_sample = np.zeros((nSample, TActual, N))
+st = time.time()
 for n in range(N):
     # n = 0
     print(n)
@@ -183,8 +216,10 @@ for n in range(N):
 
     # Bern: Retrospective Analysis
     st = time.time()
-    [sat_bern, sRt_bern, ssrt_bern, ssst_bern] = \
-        RA_Bernoulli(TActual, F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern, skipped_bern)
+    [sat_bern, sRt_bern, ssrt_bern, ssst_bern, RA_prob] = \
+        RA_Bernoulli(TActual, F_bern, G_bern, mt_bern, \
+                     Ct_bern, at_bern, Rt_bern, skipped_bern,\
+                     nSample = nSample)
     ed = time.time()
     # ed - st
     
@@ -197,9 +232,10 @@ for n in range(N):
     # ed - st
     
     # Retrospective Analysis
-    [sat_pois, sRt_pois, ssrt_pois, ssct_pois] = \
+    [sat_pois, sRt_pois, ssrt_pois, ssct_pois, RA_rate] = \
         RA_Poisson(TActual, F_pois, G_pois, mt_pois, \
-                   Ct_pois, at_pois, Rt_pois, skipped_pois)
+                   Ct_pois, at_pois, Rt_pois, skipped_pois,
+                   nSample = nSample)
     
     # Store them
     rt_bern_all[:, n] = rt_bern
@@ -211,31 +247,63 @@ for n in range(N):
     ssst_bern_all[:, n] = ssst_bern
     ssrt_pois_all[:, n] = ssrt_pois
     ssst_pois_all[:, n] = ssct_pois
+    bern_sample[:,:, n] = RA_prob
+    pois_sample[:,:, n] = RA_rate
+    
+# # Compute transition probabilities
+# nSample = 5
+# transition_probs = [None]*len(unique_nodes)
+# k = 0
+# for i in unique_nodes:
+#     # i = 2793
+#     print(i)
+#     edges_i = np.where((unique_edges[:,0] == i))[0]
+#     transition_probs_i = np.zeros((TActual, 1+len(edges_i), nSample))
+#     for i_sample in range(nSample):
+#         pi = np.random.beta(ssrt_bern_all,ssst_bern_all)
+        
+#         mu = np.random.gamma(ssrt_pois_all,1/ssst_pois_all)
+#         # pi = np.random.beta(np.repeat(ssrt_bern_all[:,:,np.newaxis], nSample, axis=2),\
+#         #                     np.repeat(ssst_bern_all[:,:,np.newaxis], nSample, axis=2))
+        
+#         # mu = np.random.gamma(np.repeat(ssrt_pois_all[:,:,np.newaxis], nSample, axis=2),\
+#         #                     np.repeat(1/ssst_pois_all[:,:,np.newaxis], nSample, axis=2))
 
-
-
+#         temp_mat = np.repeat(1 - pi[:, edges_i][:,:, np.newaxis], edges_i.shape[0], axis=2)
+#         all_t, n_outpath = temp_mat.shape[0:2]
+        
+#         temp_mat[list(np.repeat(np.arange(all_t),n_outpath)), \
+#                  list(np.arange(n_outpath))*all_t, \
+#                  list(np.arange(n_outpath))*all_t] = \
+#             (np.exp(-mu[:, edges_i])*pi[:, edges_i]).reshape(all_t*n_outpath, )
+#         transition_probs_i[:, :, i_sample] = \
+#             np.hstack((np.prod(1 - pi[:, edges_i], axis=1).reshape(all_t,1), np.prod(temp_mat, axis=1)))
+            
+#     transition_probs[k] = transition_probs_i / \
+#         np.repeat(np.sum(transition_probs_i, axis = 1)[:, np.newaxis, :,], n_outpath+1, axis = 1) 
+#     k+=1
+    
+    
 
 # Decompose fitted data
-fEst, fUpper, fLower, aiEst, aiUpper, aiLower, bjEst, bjUpper, bjLower, \
-    gijEst, gijUpper, gijLower, fEst_exp, aiEst_exp, bjEst_exp, gijEst_exp= \
-    Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all,\
-    conditional_shift_pois, \
-    TActual, unique_edges, unique_nodes, 1000, I, N)
+# fEst_exp, fUpper_exp, fLower_exp, aiEst_exp, aiUpper_exp, aiLower_exp, \
+#     bjEst_exp, bjUpper_exp, bjLower_exp, gijEst_exp, gijUpper_exp, gijLower_exp, \
+#         MC_f, MC_ai, MC_bj, MC_gij = \
+#     Recouple_DGM2(rt_bern_all, st_bern_all, rt_pois_all, st_pois_all,\
+#     conditional_shift_pois, \
+#     TActual, unique_edges, unique_nodes, 2500, I, N);
 
-
-fEst_r, fUpper_r, fLower_r, aiEst_r, aiUpper_r, aiLower_r, bjEst_r, bjUpper_r, bjLower_r, \
-    gijEst_r, gijUpper_r, gijLower_r, fEst_exp_r, aiEst_exp_r, bjEst_exp_r, gijEst_exp_r= \
+fEst_exp_r, fUpper_exp_r, fLower_exp_r, \
+    aiEst_exp_r, aiUpper_exp_r, aiLower_exp_r, \
+    bjEst_exp_r, bjUpper_exp_r, bjLower_exp_r, \
+    gijEst_exp_r, gijUpper_exp_r, gijLower_exp_r, \
+    MC_f, MC_ai, MC_bj, MC_gij = \
     Recouple_DGM2(ssrt_bern_all, ssst_bern_all, ssrt_pois_all, ssst_pois_all,\
     conditional_shift_pois, \
-    TActual, unique_edges, unique_nodes, 6000, I, N);
+    TActual, unique_edges, unique_nodes, 2500, I, N);
 
-# BK Retrospective for Poisson lambda
-
-lambda_mean, lambda_lower, lambda_upper = RA_Poisson_lambda(rt_pois_all, \
-       st_pois_all, delta_pois, samps = 1000)
-    
-p_mean, p_lower, p_upper = RA_Bernoulli_p(rt_bern_all, \
-       st_bern_all, delta_bern, samps = 1000)
+ed = time.time()
+ed - st
 
 ############################ Plotting the DGM parameters and map ############################
 # plot_time = np.array([x.time().isoformat() for x in time_grid[np.arange(1, TActual+1)]])
@@ -243,35 +311,53 @@ p_mean, p_lower, p_upper = RA_Bernoulli_p(rt_bern_all, \
 plot_time = np.array([x.date().isoformat() + "\n" + x.time().isoformat() \
                       for x in time_grid[np.arange(1, TActual+1)]])
 
-base_plot = plt.plot(plot_time, np.exp(fEst_exp_r[0, :]))
-plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+base_plot = plt.plot(plot_time, fEst_exp_r[0, :])
+plt.plot(plot_time, MC_f[0,:], 'o', ms = 2, color="black")
+plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
+plt.fill_between(plot_time, fLower_exp_r[0, :], fUpper_exp_r[0, :], alpha=0.2)
 plt.title("Baseline process")
 # plt.savefig('baseline.pdf')
 plt.show()
 
-# for i in range(aiEst_r.shape[0]):
-temp_idx = np.flip(np.argsort(np.mean(aiEst_exp_r, axis=1))[np.arange(-5, 0)])
-# temp_idx = range(0, aiEst_r.shape[0])
-alpha_plot = plt.plot(plot_time, (aiEst_exp_r[temp_idx, :]).T)
-plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+# Plot outflow process
+# temp_idx = np.array([7, 6, 5, 2, 3])
+temp_idx = np.flip(np.argsort(np.mean(aiEst_exp_r, axis=1))[np.arange(-10, 0)])
+for idx in temp_idx:
+    # idx = 8
+    plt.plot(plot_time, (aiEst_exp_r[idx, :]).T)
+    # plt.plot(plot_time, np.exp(MC_ai[idx, :]).T, 'o', ms = 2, color="black")
+    # plt.fill_between(plot_time, (aiLower_exp_r[idx, :]).T, (aiUpper_exp_r[idx, :]).T, alpha=0.2)
+    
+plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
 plt.title("outflow process (alpha_i)")
 lgd = plt.legend(labels=unique_nodes[temp_idx],
            bbox_to_anchor=(1.04, 1), 
            loc="upper left")
 # plt.savefig('outflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
 plt.show()
-# temp_idx = np.argsort(np.mean(bjEst_r, axis=1))[np.arange(-10, 0)]
-# temp_idx = range(0, bjEst_r.shape[0])
-beta_plot = plt.plot(plot_time, bjEst_exp_r[temp_idx, :].T)
-plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
+
+# Plot inflow process
+for idx in temp_idx:
+    plt.plot(plot_time, (bjEst_exp_r[idx, :]).T)
+    # plt.fill_between(plot_time, (bjLower_exp_r[idx, :]).T, (bjUpper_exp_r[idx, :]).T, alpha=0.2)
+plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
 plt.title("inflow process (beta_j)")
 lgd = plt.legend(labels=unique_nodes[temp_idx],
-           bbox_to_anchor=(1.04, 1), 
-           loc="upper left")
-plt.savefig('inflow_2.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+            bbox_to_anchor=(1.04, 1), 
+            loc="upper left")
+# plt.savefig('inflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
 plt.show()
 
-
+temp_idx = np.flip(np.argsort(np.mean(gijEst_exp_r, axis=1))[np.arange(-5, 0)])
+for idx in temp_idx:
+    plt.plot(plot_time, gijEst_exp_r[temp_idx, :].T)
+plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
+lgd = plt.legend(labels=unique_edges[temp_idx, :],
+           bbox_to_anchor=(1.04, 1), 
+           loc="upper left")
+plt.title("affinity process (gamma_ij)")
+# plt.savefig('affinity.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.show()
 
 
 bus_plot = rio.plot(alpha=0.2)
@@ -281,23 +367,23 @@ for i in np.unique(sub_bus['line']):
     bus_tmp = sub_bus.loc[sub_bus['line'] == i, :]
     xy_tmp = np.array(bus_tmp[['longitude', 'latitude']])
     plt.plot(xy_tmp[:,0], xy_tmp[:,1], ".", markersize=0.01,\
-             color = list(mcolors.CSS4_COLORS.keys())[k])
+              color = list(mcolors.CSS4_COLORS.keys())[k])
     k +=1
     
 for i in range(rio_grid.shape[0]):
     plt.vlines(x = rio_grid[i, 0], ymin = np.min(rio_grid[:, 1]), 
                 ymax =  np.max(rio_grid[:, 1]),
-            colors = 'grey', linewidth = 0.5)
+            colors = 'grey', linewidth = 0.1)
     plt.hlines(y = rio_grid[i, 1], xmin = np.min(rio_grid[:, 0]), 
                 xmax =  np.max(rio_grid[:, 0]),
-            colors = 'grey', linewidth = 0.5)
+            colors = 'grey', linewidth = 0.1)
 
 for i in unique_nodes:
     plt.text(rio_grid[i, 0]+cell_size*0.1, rio_grid[i, 1]+cell_size*0.1,\
     str(i), size = 5)
     
 
-for i in unique_nodes[temp_idx]:
+for i in unique_nodes[temp_idx[range(3)]]:
     plt.vlines(x = rio_grid[i, 0], 
                 ymin = rio_grid[i, 1], 
                 ymax = rio_grid[i, 1]+cell_size,
@@ -315,29 +401,11 @@ for i in unique_nodes[temp_idx]:
                 xmin = rio_grid[i, 0], 
                 xmax = rio_grid[i, 0]+cell_size,
             colors = 'red', linewidth = 1)
-
-# bus_plot.set_title("Trajectory of four buses on 01/25/2019 (9am-5pm)")
+# bus_plot.set_title("Trajectory of 20 buses from 01/25-02/09")
 # plt.savefig('Rio_map.pdf')
 plt.show()
 
 
-temp_idx = np.flip(np.argsort(np.mean(gijEst_exp_r, axis=1))[np.arange(-5, 0)])
-plt.plot(plot_time, gijEst_exp_r[temp_idx, :].T)
-plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
-lgd = plt.legend(labels=unique_edges[temp_idx, :],
-           bbox_to_anchor=(1.04, 1), 
-           loc="upper left")
-plt.title("affinity process (gamma_ij)")
-# plt.savefig('affinity.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
-plt.show()
 
 
-plt.plot(plot_time, lambda_mean[:, temp_idx])
-plt.xticks(plot_time[np.arange(0, len(plot_time), 20, dtype=int)])
-lgd = plt.legend(labels=unique_edges[temp_idx, :],
-           bbox_to_anchor=(1.04, 1), 
-           loc="upper left")
-plt.title("Retrospective Poisson Lambda Means")
-# plt.savefig('affinity.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
-plt.show()
 
