@@ -11,13 +11,15 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.dates
 import matplotlib.colors as mcolors
+from sklearn.preprocessing import normalize
 
 import random
-os.chdir("Houjie's Code/Utilities")
+os.chdir("bk_workspace/Utilities")
 from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
-from sklearn.preprocessing import normalize
+from BK_functions import RA_Poisson_BK, RA_Bernoulli_BK
+
 #### Load Rio bus data and shapfile 
 
 os.chdir("../../../rio_buses/bus_gps_data")
@@ -48,7 +50,7 @@ bus_subgrid = busData[(-43.3 <= busData.longitude) & (busData.longitude <= -43.2
     (-23 <= busData.latitude) & (busData.latitude <= -22.8)]
 busline_subgrid = np.unique(bus_subgrid.line)
 
-bus_date = pd.date_range('02-22-2019', periods=23, freq='24h').strftime('%m-%d-%Y')
+bus_date = pd.date_range('02-22-2019', periods=2, freq='24h').strftime('%m-%d-%Y')
 sub_bus = busData[np.isin(np.array(busData.line), busline_subgrid[0: 20]) &  \
                   np.isin(busData.date, bus_date) \
                     # & (busData.order == bus_order)
@@ -154,7 +156,7 @@ F_bern = np.array([[1],
                     [1],
                     [0]])
 
-period = 24
+period = 12
 G_bern = scipy.linalg.block_diag([[1, 1], 
                                 [0, 1]],
                                 [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
@@ -164,22 +166,22 @@ delta_bern = 0.95  # Discount factor for evolution variance
 sampleSize_bern = 1000 # Sample size of posterior and predictions
 
 # Poisson
-# F_pois = np.array([[1],
-#                     [0]])
-# G_pois = np.array([[1, 1], 
-#                     [0, 1]])
 F_pois = np.array([[1],
-                    [0],
-                    [1],
-                    [0]])
-G_pois = scipy.linalg.block_diag([[1, 1], 
-                                [0, 1]],
-                                [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
-                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
+                     [0]])
+G_pois = np.array([[1, 1], 
+                    [0, 1]])
+#F_pois = np.array([[1],
+#                    [0],
+#                    [1],
+#                    [0]])
+#G_pois = scipy.linalg.block_diag([[1, 1], 
+#                                [0, 1]],
+#                                [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
+#                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
 
 # Augment for Random Effect
 F_pois = np.r_[np.array([[1]]), F_pois]
-G_pois = block_diag(0, G_pois)
+G_pois = scipy.linalg.block_diag(1, G_pois)
 
 delta_pois = 0.9  # Discount factor for evolution variance
 RE_rho_pois = 0.9 # Discount factor for random effect. When = 1, no RE
@@ -240,6 +242,17 @@ for n in range(N):
                    Ct_pois, at_pois, Rt_pois, skipped_pois,
                    nSample = nSample)
     
+    # BK Retrospective
+    [prob_samps] = RA_Bernoulli_BK(TActual, F_pois, G_pois, mt_pois, \
+                   Ct_pois, at_pois, Rt_pois, skipped_pois,
+                   nSample = nSample)
+    [rate_samps] = RA_Poisson_BK(TActual, F_pois, G_pois, mt_pois, \
+                   Ct_pois, at_pois, Rt_pois, skipped_pois,
+                   nSample = nSample)
+    
+    # Troubleshooting
+    [F, G, mt, Ct, at, Rt] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, Rt_pois]
+    [F, G, mt, Ct, at, Rt] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern]
     # Store them
     rt_bern_all[:, n] = rt_bern
     st_bern_all[:, n] = st_bern
@@ -250,8 +263,8 @@ for n in range(N):
     ssst_bern_all[:, n] = ssst_bern
     ssrt_pois_all[:, n] = ssrt_pois
     ssst_pois_all[:, n] = ssct_pois
-    bern_sample[:,:, n] = RA_prob
-    pois_sample[:,:, n] = RA_rate
+    bern_sample[:, :, n] = prob_samps
+    pois_sample[:, :,  n] = rate_samps
     
 # # Compute transition probabilities
 # nSample = 5

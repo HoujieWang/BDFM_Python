@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import multivariate_normal
 from scipy.linalg import block_diag
+from scipy import special
 
 def RA_Poisson_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; 
@@ -33,7 +34,7 @@ def RA_Poisson_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
             state = multivariate_normal.rvs(mean = mt_star, cov = Ct[:, :, t]) #Ct_star not PD
             rate = np.exp(F.T @ state)
             rate_samps[s, t] = rate
-    return(rate_vec)
+    return(rate_samps)
 
 def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; 
@@ -44,7 +45,7 @@ def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     #G = block_diag(0, G)
     d1, d2 = G.shape
     
-    rate_samps = np.zeros(nSample, TActual)
+    samps = np.zeros((nSample, TActual))
 
     for s in np.arange(0, nSample):
 
@@ -62,7 +63,7 @@ def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
             mt_star = mt[:, t] + Bt @ (state - at[:,  t + 1])
             Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
             state = multivariate_normal.rvs(mean = mt_star, cov = Ct_star)
-            rate = scipy.special.expit(F.T @ state)
-            rate_samps[s, t] = rate
-        return(rate_vec)
+            prob = special.expit(F.T @ state)
+            samps[s, t] = prob
+        return(samps)
 

@@ -120,7 +120,7 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
             sqt[:, t] = special.polygamma(1, rt[:, t]+xt[T0+t])
             mt[:,t] = at[:,t] + Rt[:,:,t] @ F @ (sft[:, t]-ft[:, t])/qt[:, t]
             Ct[:,:,t] = Rt[:,:,t]-Rt[:,:,t] @ F @ (F.T) @ Rt[:,:,t] * (1-sqt[:, t]/qt[:, t])/qt[:, t]
-    return mt, Ct, at, Rt, rt, ct, skipped, G
+    return mt, Ct, at, Rt, rt, ct, skipped
 
 
 
