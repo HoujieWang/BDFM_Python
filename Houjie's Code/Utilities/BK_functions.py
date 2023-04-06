@@ -1,50 +1,63 @@
 import numpy as np
-from scipy.stats import poisson
+from scipy.stats import multivariate_normal
+from scipy.linalg import block_diag
 
-def RA_Poisson_lambda(rt_pois_all, st_pois_all, delta_pois, samps = 1000):
-
-    #ss_theta_pois = np.zeros(rt_pois_all.shape)
-    #Analytically for means
-    # ss_theta_pois[T - 1, :] = rt_pois_all[T-1, :] * st_pois_all[T-1, :]
-    # for t in range(2, T + 1):
-    #     ss_theta_pois[T - t, :] = (delta_pois * rt_pois_all[T - t + 1, :] * st_pois_all[T - T + 1, :] + 
-    #                            (1 - delta_pois) * rt_pois_all[T - t, :] * st_pois_all[T - t, :])
-    T = rt_pois_all.shape[0]
-    #Backsampling
-    backsample = np.zeros([rt_pois_all.shape[0], rt_pois_all.shape[1], samps])
-    for s in np.arange(0, samps):
-        backsample[-1, :, s] = np.random.gamma(rt_pois_all[-1, :], st_pois_all[-1, :])
-        for t in np.arange(-2, -(T + 1), -1):
-            epsilon = np.random.gamma((1 - delta_pois) * rt_pois_all[t, :], st_pois_all[t, :])
-            backsample[t, :, s] = delta_pois * backsample[t + 1, :, s] + epsilon
-            
-    ss_mean = np.mean(backsample, 2)
-    ss_lower = np.quantile(backsample, .025, 2)
-    ss_upper = np.quantile(backsample, .975, 2)
+def RA_Poisson_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
+    # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; 
+    # at = at_pois; Rt = Rt_pois; skipped = skipped_pois;
+   
+    # Change F, G and delta for random effect
+    F = np.r_[np.array([[1]]), F]
+    G = block_diag(0, G)
+    d1, d2 = G.shape
     
-    return(ss_mean, ss_lower, ss_upper)
+    rate_vec = np.zeros(nSample)
+    # Starting Seed
+    state = multivariate_normal.rvs(mean = mt[: ,TActual - 1], 
+                            cov = Ct[:,: ,TActual - 1])
+    # Trajectory
+    for t in np.arange(TActual-2, -1, -1):
+        #Skip the time points not updated
+        #if skipped[:,t+1]:
+            #sat[:,t] = sat[:,t+1]
+            #sRt[:,:,t] = sRt[:,:,t+1]
+            #continue
+        Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
+        
+        mt_star = mt[:, t] + Bt @ (state - at[:,  t + 1])
+        Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
+        #mt_star = (1 - delta) * mt[:, t] + delta * np.linalg.inv(G) @ state
+        #Ct_star = (1 - delta) * Ct[:, :, t]
+        state = multivariate_normal.rvs(mean = mt_star, cov = Ct[:, :, t]) #Ct_star not PD
+        rate = np.exp(F.T @ state)
+        rate_vec[t] = rate
+    return(rate_vec)
 
-def RA_Bernoulli_p(rt_bern_all, st_bern_all, delta_bern, samps = 1000):
-    T = rt_bern_all.shape[0]
-    #Backsampling
-    backsample = np.zeros([rt_bern_all.shape[0], rt_bern_all.shape[1], samps])
-    for s in np.arange(0, samps):
-        backsample[-1, :, s] = np.random.beta(rt_bern_all[-1, :], st_bern_all[-1, :])
-        for t in np.arange(-2, -(T + 1), -1):
-            epsilon = (1 - delta_bern) * np.random.beta(rt_bern_all[t, :], st_bern_all[t, :])
-            backsample[t, :, s] = delta_bern * backsample[t + 1, :, s] + epsilon
-            
-    ss_mean = np.mean(backsample, 2)
-    ss_lower = np.quantile(backsample, .025, 2)
-    ss_upper = np.quantile(backsample, .975, 2)
+def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
+    # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; 
+    # at = at_pois; Rt = Rt_pois; skipped = skipped_pois;
+   
+    # Change F, G and delta for random effect
+    F = np.r_[np.array([[1]]), F]
+    G = block_diag(0, G)
+    d1, d2 = G.shape
     
-    return(ss_mean, ss_lower, ss_upper)
+    rate_vec = np.zeros(nSample)
+    # Starting Seed
+    state = multivariate_normal.rvs(mean = mt[: ,TActual - 1], 
+                            cov = Ct[:,: ,TActual - 1])
+    # Trajectory
+    for t in np.arange(TActual-2, -1, -1):
+        #Skip the time points not updated
+        #if skipped[:,t+1]:
+            #sat[:,t] = sat[:,t+1]
+            #sRt[:,:,t] = sRt[:,:,t+1]
+            #continue
+        Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
+        mt_star = mt[:, t] + Bt @ (state - at[:,  t + 1])
+        Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
+        state = multivariate_normal.rvs(mean = mt_star, cov = Ct_star)
+        rate = scipy.special.expit(F.T @ state)
+        rate_vec[t] = rate
+    return(rate_vec)
 
-# def get_transition_prob(unique_edges, path, t):
-#     loc1 = path[t]
-#     loc2 = path[t+1]
-#     index = np.where((unique_edges[:, 0] == loc1) & (unique_edges[:, 1] == loc2))
-#     transition_prob = (np.exp(np.log(p_mean[t, index])
-#         + np.log(poisson.pmf(0, lambda_mean[t, index]))
-#         + np.log(np.log(1 - p_mean[t][:index]))
-#         + np.log(np.log(1 - p_mean[t][(index + 1):]))))
