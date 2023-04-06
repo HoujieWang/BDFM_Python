@@ -147,11 +147,11 @@ N = flow_count.shape[0]
 
 # Bernoulli
 
-# F_bern = np.array([[1],
-#                     [0]])
-# G_bern = np.array([[1, 1], 
-#                     [0, 1]])
 F_bern = np.array([[1],
+                     [0]])
+G_bern = np.array([[1, 1], 
+                     [0, 1]])
+""" F_bern = np.array([[1],
                     [0],
                     [1],
                     [0]])
@@ -160,7 +160,7 @@ period = 12
 G_bern = scipy.linalg.block_diag([[1, 1], 
                                 [0, 1]],
                                 [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
-                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
+                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]]) """
 
 delta_bern = 0.95  # Discount factor for evolution variance
 sampleSize_bern = 1000 # Sample size of posterior and predictions
@@ -203,7 +203,7 @@ ssst_bern_all = np.zeros((TActual, N))
 ssrt_pois_all = np.zeros((TActual, N))
 ssst_pois_all = np.zeros((TActual, N))
 
-nSample = 1000
+nSample = 100
 pois_sample = np.zeros((nSample, TActual, N))
 bern_sample = np.zeros((nSample, TActual, N))
 st = time.time()
@@ -243,16 +243,16 @@ for n in range(N):
                    nSample = nSample)
     
     # BK Retrospective
-    [prob_samps] = RA_Bernoulli_BK(TActual, F_pois, G_pois, mt_pois, \
-                   Ct_pois, at_pois, Rt_pois, skipped_pois,
+    prob_samps = RA_Bernoulli_BK(TActual, F_bern, G_bern, mt_bern, \
+                   Ct_bern, at_bern, Rt_bern, skipped_bern,
                    nSample = nSample)
-    [rate_samps] = RA_Poisson_BK(TActual, F_pois, G_pois, mt_pois, \
+    rate_samps = RA_Poisson_BK(TActual, F_pois, G_pois, mt_pois, \
                    Ct_pois, at_pois, Rt_pois, skipped_pois,
                    nSample = nSample)
     
     # Troubleshooting
-    [F, G, mt, Ct, at, Rt] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, Rt_pois]
-    [F, G, mt, Ct, at, Rt] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern]
+    #[F, G, mt, Ct, at, Rt] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, Rt_pois]
+    #[F, G, mt, Ct, at, Rt] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern]
     # Store them
     rt_bern_all[:, n] = rt_bern
     st_bern_all[:, n] = st_bern
