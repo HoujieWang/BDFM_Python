@@ -16,24 +16,23 @@ def RA_Poisson_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
 
     for s in np.arange(0, nSample):
         # Starting Seed
-        state = multivariate_normal.rvs(mean = mt[: ,TActual - 1], 
-                                cov = Ct[:,: ,TActual - 1])
+        mt_star = mt[: ,TActual - 1]
+        Ct_star = Ct[:,: ,TActual - 1]
+        state = np.random.multivariate_normal(mean = mt_star, 
+                                cov = Ct_star)
+        rate_samps[s, TActual - 1] = np.exp(F.T @ state)
         # Trajectory
         for t in np.arange(TActual-2, -1, -1):
             #Skip the time points not updated
-            #if skipped[:,t+1]:
-                #sat[:,t] = sat[:,t+1]
-                #sRt[:,:,t] = sRt[:,:,t+1]
-                #continue
-            Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
-            
-            mt_star = mt[:, t] + Bt @ (state - at[:,  t + 1])
-            Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
-            #mt_star = (1 - delta) * mt[:, t] + delta * np.linalg.inv(G) @ state
-            #Ct_star = (1 - delta) * Ct[:, :, t]
-            state = multivariate_normal.rvs(mean = mt_star, cov = Ct[:, :, t]) #Ct_star not PD
-            rate = np.exp(F.T @ state)
-            rate_samps[s, t] = rate
+            if skipped[:,t+1]:
+                state = np.random.multivariate_normal(mean = mt_star, cov = Ct_star)
+                rate_samps[s, t] = np.exp(F.T @ state)
+            else:
+                Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
+                mt_star = mt[:, t] + Bt @ (state - at[:,  t + 1])
+                Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
+                state = np.random.multivariate_normal(mean = mt_star, cov = Ct_star)
+                rate_samps[s, t] = np.exp(F.T @ state)
     return(rate_samps)
 
 def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
@@ -50,20 +49,22 @@ def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     for s in np.arange(0, nSample):
 
         # Starting Seed
-        state = multivariate_normal.rvs(mean = mt[: ,TActual - 1], 
-                                cov = Ct[:,: ,TActual - 1])
+        mt_star = mt[: ,TActual - 1]
+        Ct_star = Ct[:,: ,TActual - 1]
+        state = np.random.multivariate_normal(mean = mt_star, 
+                                cov = Ct_star)
+        samps[s, TActual - 1] = special.expit(F.T @ state)
         # Trajectory
         for t in np.arange(TActual-2, -1, -1):
             #Skip the time points not updated
-            #if skipped[:,t+1]:
-                #sat[:,t] = sat[:,t+1]
-                #sRt[:,:,t] = sRt[:,:,t+1]
-                #continue
-            Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
-            mt_star = mt[:, t] + Bt @ (state - at[:,  t + 1])
-            Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
-            state = multivariate_normal.rvs(mean = mt_star, cov = Ct_star)
-            prob = special.expit(F.T @ state)
-            samps[s, t] = prob
-        return(samps)
+            if skipped[:,t+1]:
+                state = np.random.multivariate_normal(mean = mt_star, cov = Ct_star)
+                samps[s, t] = np.exp(F.T @ state)
+            else:
+                Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
+                mt_star = mt[:, t] + Bt @ (state - at[:,  t + 1])
+                Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
+                state = np.random.multivariate_normal(mean = mt_star, cov = Ct_star)
+                samps[s, t] = special.expit(F.T @ state)
+    return(samps)
 

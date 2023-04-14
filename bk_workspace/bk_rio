@@ -61,7 +61,7 @@ bus_time = np.array([np.datetime64(datetime.strptime(t, '%m-%d-%Y%H:%M:%S')) \
                         for t in np.array(sub_bus.date) + np.array(sub_bus.time)])
 
 # Generate time grid points
-time_intl = '60min'
+time_intl = '30min'
 time_grid = pd.date_range(bus_date[0], periods=24*1*len(bus_date), freq=time_intl)
 # time_grid = time_grid[(np.where(time_grid >= np.min(bus_time))[0][0]-1): len(time_grid)]
 
@@ -181,10 +181,10 @@ G_pois = np.array([[1, 1],
 
 # Augment for Random Effect
 F_pois = np.r_[np.array([[1]]), F_pois]
-G_pois = scipy.linalg.block_diag(1, G_pois)
+G_pois = scipy.linalg.block_diag(0, G_pois)
 
-delta_pois = 0.9  # Discount factor for evolution variance
-RE_rho_pois = 0.9 # Discount factor for random effect. When = 1, no RE
+delta_pois = 0.99  # Discount factor for evolution variance
+RE_rho_pois = .999 # Discount factor for random effect. When = 1, no RE
 conditional_shift_pois = 1 # Shift of conditional Poisson
 sampleSize_pois = 1000 # Sample size of posterior and predictions
 
@@ -265,7 +265,30 @@ for n in range(N):
     ssst_pois_all[:, n] = ssct_pois
     bern_sample[:, :, n] = prob_samps
     pois_sample[:, :,  n] = rate_samps
-    
+
+
+bern_mean = np.mean(bern_sample, 0)
+bern_upper = np.quantile(bern_sample, .975, 0)
+bern_lower = np.quantile(bern_sample, .025, 0)
+
+pois_mean = np.mean(pois_sample, 0)
+pois_upper = np.quantile(pois_sample, .975, 0)
+pois_lower = np.quantile(pois_sample, .025, 0)
+
+pois_mean_2 = ssrt_pois_all / ssst_pois_all
+bern_mean_2 = ssrt_bern_all / (ssrt_bern_all + ssst_bern_all)
+np.var(pois_sample[:, :, 10], 0)
+
+plot_time = np.array([x.date().isoformat() + "\n" + x.time().isoformat() \
+                      for x in time_grid[np.arange(1, TActual+1)]])
+plt.plot(plot_time, (pois_mean[:, 10]))
+plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
+plt.show()
+
+state = np.random.multivariate_normal(mean = mt_pois[: ,TActual - 1], 
+                        cov = Ct_pois[:,: ,TActual - 1])
+np.exp(F_pois.T @ state)
+
 # # Compute transition probabilities
 # nSample = 5
 # transition_probs = [None]*len(unique_nodes)
@@ -421,7 +444,21 @@ for i in unique_nodes[temp_idx[range(3)]]:
 # plt.savefig('Rio_map.pdf')
 plt.show()
 
-
-
+# Plot Poisson Parameter
+#temp_idx = np.array([7, 6, 5, 2, 3])
+temp_idx = np.flip(np.argsort(np.mean(gijEst_exp_r, axis=1))[np.arange(-5, 0)])
+for idx in temp_idx:
+    # idx = 8
+    plt.plot(plot_time, (pois_mean[:, idx]))
+    # plt.plot(plot_time, np.exp(MC_ai[idx, :]).T, 'o', ms = 2, color="black")
+    # plt.fill_between(plot_time, (aiLower_exp_r[idx, :]).T, (aiUpper_exp_r[idx, :]).T, alpha=0.2)
+    
+plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
+plt.title("Poisson Parameters")
+lgd = plt.legend(labels=unique_nodes[temp_idx],
+           bbox_to_anchor=(1.04, 1), 
+           loc="upper left")
+# plt.savefig('outflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.show()
 
 
