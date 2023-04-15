@@ -8,7 +8,7 @@ def RA_Poisson_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
    
     # Change F, G and delta for random effect
     F = np.r_[np.array([[1]]), F]
-    G = block_diag(0, G)
+    G = block_diag(1, G)
     d1, d2 = G.shape
     
     rate_vec = np.zeros(nSample)
@@ -39,7 +39,7 @@ def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
    
     # Change F, G and delta for random effect
     F = np.r_[np.array([[1]]), F]
-    G = block_diag(0, G)
+    G = block_diag(1, G)
     d1, d2 = G.shape
     
     rate_vec = np.zeros(nSample)
