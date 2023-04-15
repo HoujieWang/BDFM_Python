@@ -1,5 +1,6 @@
 from scipy.linalg import block_diag
 from scipy import special
+import scipy
 import numpy as np
 import numpy.matlib
 
@@ -28,13 +29,114 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
     # Add it anyway. RE_rho = 1 is the case when I don't want RE
     # Too bad matlab cannot assign default value as I do in R
     
+    # flow = flow_count
     # F = F_pois; G = G_pois; delta = delta_pois; RE_rho = RE_rho_pois; conditional_shift = conditional_shift_pois;
     
-    F = np.r_[np.array([[1]]), F]
-    G = block_diag(0, G)
+    # F = np.r_[np.array([[1]]), F]
+    # G = block_diag(0, G)
     d1, d2 = G.shape
-    delta = np.diag(np.c_[np.array([RE_rho]), np.matlib.repmat(delta,1,d2-1)][0,:])
+    # delta = np.diag(np.c_[np.array([RE_rho]), np.matlib.repmat(delta,1,d2-1)][0,:])
     
+    # Initialize parameters
+    mt  = np.zeros((d2,TActual))
+    Ct  = np.zeros((d2,d2,TActual))
+    at  = np.zeros((d1,TActual))
+    Rt  = np.zeros((d1,d1,TActual))
+    rt  = np.zeros((1,TActual))
+    ct  = np.zeros((1,TActual))
+    ft  = np.zeros((1,TActual+1))
+    qt  = np.zeros((1,TActual+1))
+    sft = np.zeros((1,TActual))
+    sqt = np.zeros((1,TActual))
+    
+    skipped = np.zeros((1, TActual))
+
+    # Prior: Poisson
+    # m0 = np.array([1, np.log(max(flow[n,T0-1],1)), 0]).reshape(d2, 1)
+    # C0 = 0.1 * np.eye(3)
+    
+    m0 = np.concatenate((np.array([1, np.log(max(flow[n,T0-1],1)), 0]), 
+                              np.zeros((d2-3, ))
+                              )).reshape(d2, 1)
+    C0 = 0.1 * np.eye(d2)
+
+    # Retrieve up data series
+    xt = flow[n, :]
+    # Shift count for conditional poisson
+    xt[np.where(xt == eps)] = 0
+    xt = xt - conditional_shift
+
+    
+    # To revisit: First time point FORCE update: if <0. set to 0;
+    if xt[T0] < 0:
+        xt[T0] = 0
+    
+    for t in range(TActual):
+        # t = 0
+        # No update when xt[T0+t-1] < 0 for conditional Poisson model
+        
+        if conditional_shift != 0 and xt[T0+t] < 0:
+            if t == 0:
+                mt[:,t] = m0[:, 0]
+                Ct[:,:,t] = C0
+            else:
+                at[:,t] = at[:,t-1]
+                Rt[:,:,t] = Rt[:,:,t-1]
+
+                mt[:,t] = mt[:,t-1]
+                Ct[:,:,t] = Ct[:,:,t-1]
+
+                rt[:, t] = rt[:, t-1]
+                ct[:, t] = ct[:, t-1]
+            
+            skipped[:,t] = True
+        # Update
+        else:
+            if t == 0:
+                at[:,t]   = (G @ m0)[:, 0]
+                Rt[:,:,t] = np.linalg.inv(delta) @ G @ C0 @ G.T
+            else:
+                at[:,t]   = (G @ mt)[:,t-1]
+                Rt[:,:,t] = np.linalg.inv(delta) @ G @ Ct[:,:,t-1] @ G.T
+            
+            ft[:, t]      = F.T @ at[:,t]
+            qt[:, t]      = F[1:3].T @ Rt[1:3,1:3,t] @ F[1:3] # just for clarity
+            
+            # Random effect
+            # Rt[0,0,t] = qt[:, t] * (1-delta[0,0]) / delta[0,0] # vt
+            # qt[:, t]  = qt[:, t] + Rt[0,0,t] # % p.31 qt + vt. to revisit param
+            
+            # Get numerical root of Gamma approximation
+            
+            # rnew = scipy.optimize.least_squares(pois_eq, 1, args = (qt[:, t]), bounds = ((0), (1e16)))
+            # rt[:, t] = rnew.x
+            # ct[:, t] = np.exp(special.polygamma(0, rt[:, t])-ft[:, t])
+            
+            
+            rt[:, t] = pois_eq_solver(1/qt[0, t], qt[0, t])
+            ct[:, t] = np.exp(special.polygamma(0, rt[:, t])-ft[:, t])
+            
+            
+            # sft[:, t] = special.polygamma(0, rt[:, t]+xt[T0+t]) - np.log(ct[:, t]+1)
+            sft[:, t] = special.polygamma(0, rt[:, t]+xt[T0+t]) - np.log(ct[:, t]+mN[t,0])
+            sqt[:, t] = special.polygamma(1, rt[:, t]+xt[T0+t])
+            mt[:,t] = at[:,t] + Rt[:,:,t] @ F @ (sft[:, t]-ft[:, t])/qt[:, t]
+            Ct[:,:,t] = Rt[:,:,t]-Rt[:,:,t] @ F @ (F.T) @ Rt[:,:,t] * (1-sqt[:, t]/qt[:, t])/qt[:, t]
+            Ct[:,:,t] = 0.5*(Ct[:,:,t] + Ct[:,:,t].T)
+            
+    return mt, Ct, at, Rt, rt, ct, skipped
+def FF_Poisson2(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_shift):
+   
+    # Incorporate Random effect: change F, G, delta, mt, Ct, at, Rt
+    # Add it anyway. RE_rho = 1 is the case when I don't want RE
+    # Too bad matlab cannot assign default value as I do in R
+    
+    # F = F_pois; G = G_pois; delta = delta_pois; RE_rho = RE_rho_pois; conditional_shift = conditional_shift_pois;
+    
+    # F = np.r_[np.array([[1]]), F]
+    # G = block_diag(0, G)
+    d1, d2 = G.shape
+    # delta = np.diag(np.c_[np.array([RE_rho]), np.matlib.repmat(delta,1,d2-1)][0,:])
     # Initialize parameters
     mt  = np.zeros((d2,TActual))
     Ct  = np.zeros((d2,d2,TActual))
@@ -91,16 +193,23 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
         else:
             if t == 0:
                 at[:,t]   = (G @ m0)[:, 0]
-                Rt[:,:,t] = np.linalg.inv(delta) @ G @ C0 @ G.T
+                # Rt[:,:,t] = np.linalg.inv(delta) @ G @ C0 @ G.T
+                
+                
+                Rt[:,:,t] = G @ C0 @ G.T
+                Rt[:,:,t] = Rt[:,:,t] + Rt[:,:,t] * delta
             else:
                 at[:,t]   = (G @ mt)[:,t-1]
-                Rt[:,:,t] = np.linalg.inv(delta) @ G @ Ct[:,:,t-1] @ G.T
+                # Rt[:,:,t] = np.linalg.inv(delta) @ G @ Ct[:,:,t-1] @ G.T
+                
+                Rt[:,:,t] = G @ Ct[:,:,t-1] @ G.T
+                Rt[:,:,t] = Rt[:,:,t] + Rt[:,:,t] * delta
             
             ft[:, t]      = F.T @ at[:,t]
             qt[:, t]      = F[1:3].T @ Rt[1:3,1:3,t] @ F[1:3] # just for clarity
             
             # Random effect
-            Rt[0,0,t] = qt[:, t] * (1-delta[0,0]) / delta[0,0] # vt
+            # Rt[0,0,t] = qt[:, t] * (1-delta[0,0]) / delta[0,0] # vt
             qt[:, t]  = qt[:, t] + Rt[0,0,t] # % p.31 qt + vt. to revisit param
             
             # Get numerical root of Gamma approximation
@@ -120,7 +229,10 @@ def FF_Poisson(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_s
             sqt[:, t] = special.polygamma(1, rt[:, t]+xt[T0+t])
             mt[:,t] = at[:,t] + Rt[:,:,t] @ F @ (sft[:, t]-ft[:, t])/qt[:, t]
             Ct[:,:,t] = Rt[:,:,t]-Rt[:,:,t] @ F @ (F.T) @ Rt[:,:,t] * (1-sqt[:, t]/qt[:, t])/qt[:, t]
+            Ct[:,:,t] = 0.5*(Ct[:,:,t] + Ct[:,:,t].T)
+            Ct[:,:,t] = 0.5*(Ct[:,:,t] + Ct[:,:,t].T)
     return mt, Ct, at, Rt, rt, ct, skipped
+
 
 
 
@@ -132,8 +244,8 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
    
 
     # Change F, G and delta for random effect
-    F = np.r_[np.array([[1]]), F]
-    G = block_diag(0, G)
+    # F = np.r_[np.array([[1]]), F]
+    # G = block_diag(0, G)
     d1, d2 = G.shape
     
     # Initialization
@@ -150,14 +262,21 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     
     # Retrospective Analysis
     for t in np.arange(TActual-2, -1, -1):
-        # t = 380
+        # t = 38
         # Skipp the time points not updated
         if skipped[:,t+1]:
             sat[:,t] = sat[:,t+1]
             sRt[:,:,t] = sRt[:,:,t+1]
             continue
         
-        Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
+        # Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
+        if (scipy.linalg.det(Rt[:,:,t+1]) > 0):
+            Bt = Ct[:,:,t] @ G.T @ scipy.linalg.inv(Rt[:,:,t+1])
+            
+        else:
+            temp = scipy.linalg.eig(Rt[:,:,t+1])
+            Bt = Ct[:,:,t] @ G.T @temp[1] @ np.diag(1 / np.real(temp[0])) @ temp[1].T
+            
         sat[:,t] = mt[:,t] - Bt @ (at[:,t+1] - sat[:,t+1])
         sRt[:,:,t] = Ct[:,:,t] - Bt @ (Rt[:,:,t+1] - sRt[:,:,t+1]) @ Bt.T
     
@@ -184,4 +303,39 @@ def RA_Poisson(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
                                           size=(nSample, ssft.shape[1])))
     
     return sat, sRt, ssrt, ssct, rate_sample
+def RA_Poisson2(TActual, delta, F, G, mt, Ct, at, Rt, skipped, nSample):
+    # F = F_pois; G = G_pois; mt = mt_pois; Ct = Ct_pois; delta = delta_pois
+    # at = at_pois; Rt = Rt_pois; skipped = skipped_pois;
 
+    
+    RA_samples = np.zeros((nSample, TActual))
+    
+    # Starting Seed
+    d = G.shape[0]
+    all_states = np.random.multivariate_normal(mean=mt[: ,TActual - 1], \
+                     cov=Ct[:,: ,TActual - 1], \
+                     size=nSample).T
+    # Trajectory
+    for t in np.arange(TActual-2, -1, -1):
+        # t = 548
+        #Skip the time points not updated
+        #if skipped[:,t+1]:
+            #sat[:,t] = sat[:,t+1]
+            #sRt[:,:,t] = sRt[:,:,t+1]
+            #continue
+        Bt = Ct[:,:,t] @ G.T @ np.linalg.inv(Rt[:,:,t+1])
+        mt_star = mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
+                  Bt @ (all_states - at[:,  t: (t + 1)] @ np.ones((1, nSample)))
+                  
+        Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
+
+        temp_normal = np.random.normal(loc = 0, \
+                                        scale = 1,\
+                                        size=(d, nSample))
+            
+        # all_states = np.linalg.cholesky(Ct_star) @ temp_normal + mt_star
+        eig_decomp = np.linalg.eig(Ct_star)
+        eigen_vals = np.sqrt(eig_decomp[0])
+        all_states  = eig_decomp[1]@np.diag(eigen_vals) @ temp_normal + mt_star
+        RA_samples[:, t] = np.exp(F.T @ all_states)
+    return(RA_samples)
