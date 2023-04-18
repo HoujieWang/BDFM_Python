@@ -18,7 +18,7 @@ os.chdir("bk_workspace/Utilities")
 from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
-from BK_functions import RA_Poisson_BK, RA_Bernoulli_BK
+from BK_functions import RA_Poisson_BK, RA_Bernoulli_BK, FF_Poisson_BK, FF_Bernoulli_BK
 
 #### Load Rio bus data and shapfile 
 
@@ -50,7 +50,8 @@ bus_subgrid = busData[(-43.3 <= busData.longitude) & (busData.longitude <= -43.2
     (-23 <= busData.latitude) & (busData.latitude <= -22.8)]
 busline_subgrid = np.unique(bus_subgrid.line)
 
-bus_date = pd.date_range('02-22-2019', periods=2, freq='24h').strftime('%m-%d-%Y')
+days = 5
+bus_date = pd.date_range('02-18-2019', periods=days, freq='24h').strftime('%m-%d-%Y')
 sub_bus = busData[np.isin(np.array(busData.line), busline_subgrid[0: 20]) &  \
                   np.isin(busData.date, bus_date) \
                     # & (busData.order == bus_order)
@@ -62,7 +63,8 @@ bus_time = np.array([np.datetime64(datetime.strptime(t, '%m-%d-%Y%H:%M:%S')) \
 
 # Generate time grid points
 time_intl = '30min'
-time_grid = pd.date_range(bus_date[0], periods=24*1*len(bus_date), freq=time_intl)
+period = 48
+time_grid = pd.date_range(bus_date[0], periods=period*1*len(bus_date), freq=time_intl)
 # time_grid = time_grid[(np.where(time_grid >= np.min(bus_time))[0][0]-1): len(time_grid)]
 
 bus_id = np.unique(sub_bus.order)
@@ -142,8 +144,8 @@ for t in range(TActual):
 
 eps = 1e-2
 flow_count[flow_count == 0] = eps
-
 N = flow_count.shape[0]
+period = 48
 
 # Bernoulli
 
@@ -151,40 +153,39 @@ F_bern = np.array([[1],
                      [0]])
 G_bern = np.array([[1, 1], 
                      [0, 1]])
-""" F_bern = np.array([[1],
+F_bern = np.array([[1],
                     [0],
                     [1],
                     [0]])
 
-period = 12
 G_bern = scipy.linalg.block_diag([[1, 1], 
                                 [0, 1]],
                                 [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
-                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]]) """
+                                [-np.sin(2*np.pi/period), np.cos(2*np.pi/period)]])
 
 delta_bern = 0.95  # Discount factor for evolution variance
-sampleSize_bern = 1000 # Sample size of posterior and predictions
+sampleSize_bern = 100 # Sample size of posterior and predictions
 
 # Poisson
 F_pois = np.array([[1],
                      [0]])
 G_pois = np.array([[1, 1], 
                     [0, 1]])
-#F_pois = np.array([[1],
-#                    [0],
-#                    [1],
-#                    [0]])
-#G_pois = scipy.linalg.block_diag([[1, 1], 
-#                                [0, 1]],
-#                                [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
-#                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
+F_pois = np.array([[1],
+                    [0],
+                    [1],
+                    [0]])
+G_pois = scipy.linalg.block_diag([[1, 1], 
+                                [0, 1]],
+                                [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
+                                [-np.sin(2*np.pi/period), np.cos(2*np.pi/period)]])
 
 # Augment for Random Effect
 F_pois = np.r_[np.array([[1]]), F_pois]
 G_pois = scipy.linalg.block_diag(0, G_pois)
 
 delta_pois = 0.99  # Discount factor for evolution variance
-RE_rho_pois = .999 # Discount factor for random effect. When = 1, no RE
+RE_rho_pois = .9 # Discount factor for random effect. When = 1, no RE
 conditional_shift_pois = 1 # Shift of conditional Poisson
 sampleSize_pois = 1000 # Sample size of posterior and predictions
 
@@ -210,16 +211,23 @@ st = time.time()
 for n in range(N):
     # n = 0
     print(n)
-    # Bern: Forward Filtering
     mN = m[:,np.where(unique_nodes == unique_edges[n,0])[0]]
     
+    # Forward Filtering
     st = time.time()
     mt_bern, Ct_bern, at_bern, Rt_bern, rt_bern, st_bern, skipped_bern = \
-    FF_Bernoulli(F_bern, G_bern, delta_bern, flow_count, n, T0, TActual, eps)
+        FF_Bernoulli_BK(F_bern, G_bern, delta_bern, flow_count, n, T0, TActual, eps)
     ed = time.time()
     # ed - st
 
-    # Bern: Retrospective Analysis
+    st = time.time()
+    [mt_pois, Ct_pois, at_pois, Rt_pois, rt_pois, ct_pois, skipped_pois] = \
+        FF_Poisson_BK(F_pois, G_pois, delta_pois, flow_count, n, mN, T0, TActual, \
+                   eps, RE_rho_pois, conditional_shift_pois)
+    ed = time.time()
+    # ed - st
+
+    # Retrospective Analysis
     st = time.time()
     [sat_bern, sRt_bern, ssrt_bern, ssst_bern, RA_prob] = \
         RA_Bernoulli(TActual, F_bern, G_bern, mt_bern, \
@@ -228,21 +236,12 @@ for n in range(N):
     ed = time.time()
     # ed - st
     
-    # Forward Filtering
-    st = time.time()
-    [mt_pois, Ct_pois, at_pois, Rt_pois, rt_pois, ct_pois, skipped_pois] = \
-        FF_Poisson(F_pois, G_pois, delta_pois, flow_count, n, mN, T0, TActual, \
-                   eps, RE_rho_pois, conditional_shift_pois)
-    ed = time.time()
-    # ed - st
-    
-    # Retrospective Analysis
     [sat_pois, sRt_pois, ssrt_pois, ssct_pois, RA_rate] = \
         RA_Poisson(TActual, F_pois, G_pois, mt_pois, \
                    Ct_pois, at_pois, Rt_pois, skipped_pois,
                    nSample = nSample)
     
-    # BK Retrospective
+    # BK Retrospective_BK
     prob_samps = RA_Bernoulli_BK(TActual, F_bern, G_bern, mt_bern, \
                    Ct_bern, at_bern, Rt_bern, skipped_bern,
                    nSample = nSample)
@@ -251,8 +250,9 @@ for n in range(N):
                    nSample = nSample)
     
     # Troubleshooting
-    #[F, G, mt, Ct, at, Rt] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, Rt_pois]
-    #[F, G, mt, Ct, at, Rt] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern]
+    [F, G, mt, Ct, at, Rt, skipped, RE_rho, delta, flow] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, 
+                                                      Rt_pois, skipped_pois, RE_rho_pois, delta_pois, flow_count]
+    [F, G, mt, Ct, at, Rt, skipped] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern, skipped_bern]
     # Store them
     rt_bern_all[:, n] = rt_bern
     st_bern_all[:, n] = st_bern
@@ -267,27 +267,16 @@ for n in range(N):
     pois_sample[:, :,  n] = rate_samps
 
 
-bern_mean = np.mean(bern_sample, 0)
-bern_upper = np.quantile(bern_sample, .975, 0)
-bern_lower = np.quantile(bern_sample, .025, 0)
+ra_bern_mean = np.mean(bern_sample, 0)
+ra_bern_upper = np.quantile(bern_sample, .975, 0)
+ra_bern_lower = np.quantile(bern_sample, .025, 0)
 
-pois_mean = np.mean(pois_sample, 0)
-pois_upper = np.quantile(pois_sample, .975, 0)
-pois_lower = np.quantile(pois_sample, .025, 0)
+ra_pois_mean = np.mean(pois_sample, 0)
+ra_pois_upper = np.quantile(pois_sample, .975, 0)
+ra_pois_lower = np.quantile(pois_sample, .025, 0)
 
-pois_mean_2 = ssrt_pois_all / ssst_pois_all
-bern_mean_2 = ssrt_bern_all / (ssrt_bern_all + ssst_bern_all)
-np.var(pois_sample[:, :, 10], 0)
-
-plot_time = np.array([x.date().isoformat() + "\n" + x.time().isoformat() \
-                      for x in time_grid[np.arange(1, TActual+1)]])
-plt.plot(plot_time, (pois_mean[:, 10]))
-plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
-plt.show()
-
-state = np.random.multivariate_normal(mean = mt_pois[: ,TActual - 1], 
-                        cov = Ct_pois[:,: ,TActual - 1])
-np.exp(F_pois.T @ state)
+ff_pois_mean = ssrt_pois_all / ssst_pois_all
+ff_bern_mean = ssrt_bern_all / (ssrt_bern_all + ssst_bern_all)
 
 # # Compute transition probabilities
 # nSample = 5
@@ -399,6 +388,27 @@ plt.title("affinity process (gamma_ij)")
 plt.show()
 
 
+
+
+# Plot Poisson Parameter
+#temp_idx = np.array([7, 6, 5, 2, 3])
+temp_idx = np.flip(np.argsort(np.mean(gijEst_exp_r, axis=1))[np.arange(-5, 0)])
+for idx in temp_idx:
+    # idx = 8
+    plt.plot(plot_time, (ra_pois_mean[:, idx]))
+    # plt.plot(plot_time, np.exp(MC_ai[idx, :]).T, 'o', ms = 2, color="black")
+    # plt.fill_between(plot_time, (aiLower_exp_r[idx, :]).T, (aiUpper_exp_r[idx, :]).T, alpha=0.2)
+    
+plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
+plt.title("Poisson Parameters")
+lgd = plt.legend(labels=unique_nodes[temp_idx],
+           bbox_to_anchor=(1.04, 1), 
+           loc="upper left")
+# plt.savefig('outflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+plt.show()
+
+
+
 bus_plot = rio.plot(alpha=0.2)
 k = 0
 for i in np.unique(sub_bus['line']):
@@ -443,22 +453,3 @@ for i in unique_nodes[temp_idx[range(3)]]:
 # bus_plot.set_title("Trajectory of 20 buses from 01/25-02/09")
 # plt.savefig('Rio_map.pdf')
 plt.show()
-
-# Plot Poisson Parameter
-#temp_idx = np.array([7, 6, 5, 2, 3])
-temp_idx = np.flip(np.argsort(np.mean(gijEst_exp_r, axis=1))[np.arange(-5, 0)])
-for idx in temp_idx:
-    # idx = 8
-    plt.plot(plot_time, (pois_mean[:, idx]))
-    # plt.plot(plot_time, np.exp(MC_ai[idx, :]).T, 'o', ms = 2, color="black")
-    # plt.fill_between(plot_time, (aiLower_exp_r[idx, :]).T, (aiUpper_exp_r[idx, :]).T, alpha=0.2)
-    
-plt.xticks(plot_time[np.linspace(0, len(plot_time)-1, 6, dtype=int)])
-plt.title("Poisson Parameters")
-lgd = plt.legend(labels=unique_nodes[temp_idx],
-           bbox_to_anchor=(1.04, 1), 
-           loc="upper left")
-# plt.savefig('outflow.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
-plt.show()
-
-
