@@ -116,7 +116,8 @@ def RA_Bernoulli_BK(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
                 Ct_star = (Ct_star + Ct_star.T)/2
                 state = np.random.multivariate_normal(mean = mt_star, cov = Ct_star)
                 samps[s, t] = special.expit(F.T @ state)
-                t = t - 1
+                if samps[s, t] > 1:
+                    samps[s, t] = .999
     return(samps)
 
 def FF_Bernoulli_BK(F, G, delta, flow, n, T0, TActual, eps):
