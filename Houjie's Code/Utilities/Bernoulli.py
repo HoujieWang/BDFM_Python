@@ -174,6 +174,7 @@ def FF_Bernoulli2(F, G, delta, flow, n, T0, TActual, eps):
         # Posterior mt, Ct
         mt[:,t]   = at[:,t] + Rt[:,:,t] @ F @ (sft[:, t]-ft[:, t]) / qt[:, t]
         Ct[:,:,t] = Rt[:,:,t] - Rt[:,:,t] @ F @ F.T @ Rt[:,:,t] * (1 - sqt[:,t] / qt[:,t]) / qt[:,t]
+        Ct[:,:,t] = 0.5*(Ct[:,:,t]+Ct[:,:,t].T)
         # np.fill_diagonal(Ct[:,:,t], np.clip(Ct[:,:,t].diagonal(), 1e-10, 1e16))
     return mt, Ct, at, Rt, rt, st, skipped
 
@@ -234,8 +235,8 @@ def RA_Bernoulli(TActual, F, G, mt, Ct, at, Rt, skipped, nSample):
     return sat, sRt, ssrt, ssst, prob_sample
 
 def Retro_sampling(TActual, discount, F, G, mt, Ct, at, Rt, skipped, nSample, family):
-    # F=F_pois; G=G_pois; mt = mt_pois; Ct = Ct_pois; discount =np.array([0.9])
-    # at = at_pois; Rt = Rt_pois; skipped = skipped_pois;
+    # F=F_bern; G=G_bern; mt = mt_bern; Ct = Ct_bern; discount =np.array([0.95])
+    # at = at_bern; Rt = Rt_bern; skipped = skipped_pois; family = "bernoulli"
    
     RA_samples = np.zeros((nSample, TActual))
     
@@ -248,20 +249,20 @@ def Retro_sampling(TActual, discount, F, G, mt, Ct, at, Rt, skipped, nSample, fa
     # Trajectory
     # for t in np.arange(TActual-2, -1, -1):
     for t in np.arange(TActual-2, -1, -1):
-        # t = 164
+        # t = 
         Rt[:,:,t+1] = 0.5*(Rt[:,:,t+1] + Rt[:,:,t+1].T)
         
         if discount.shape[0] == 1:
-            mt_star = (1 - discount) * mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
-                discount * np.linalg.inv(G) @ all_states
-            Ct_star = (1 - discount) * Ct[:, :, t]
+            mt_star = (1 - discount[0]) * mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
+                discount[0] * np.linalg.inv(G) @ all_states
+            Ct_star = (1 - discount[0]) * Ct[:, :, t]
         else:
             if (scipy.linalg.det(Rt[:,:,t+1]) > 0):
                 Bt = Ct[:,:,t] @ G.T @ scipy.linalg.inv(Rt[:,:,t+1])
                 
             else:
                 temp = scipy.linalg.eig(Rt[:,:,t+1])
-                Bt = Ct[:,:,t] @ G.T @temp[1] @ np.diag(1 / np.real(temp[0])) @ temp[1].T
+                Bt = Ct[:,:,t] @ G.T @temp[1] @ np.diag(1 / np.real(np.sqrt(temp[0]))) @ temp[1].T
             mt_star = mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
                        Bt @ (all_states - at[:,  t: (t + 1)] @ np.ones((1, nSample)))
             Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
@@ -269,22 +270,55 @@ def Retro_sampling(TActual, discount, F, G, mt, Ct, at, Rt, skipped, nSample, fa
         Ct_star = 0.5*(Ct_star + Ct_star.T)
          
         
-        
-        # all_m[:,t] = mt_star[:,0]
-        # temp_normal = np.random.normal(loc = 0, \
-        #                                 scale = 1,\
-        #                                 size=(d, nSample))
-        
         all_states = np.random.multivariate_normal(mean = np.zeros(d,), \
                                       cov = Ct_star, \
                                           size = nSample).T + np.real(mt_star)
-            
-        # eig_decomp = scipy.linalg.eig(Ct_star)
-        # eigen_sq = np.sqrt(eig_decomp[0])
-        # all_states  = eig_decomp[1]@np.diag(eigen_sq) @ temp_normal + mt_star
-        # all_states = scipy.linalg.cholesky(Ct_star) @ temp_normal + mt_star
+        
         if (family == "poisson"):
             RA_samples[:, t] = np.exp(F.T @ all_states)
         if (family == "bernoulli"):
             RA_samples[:, t] = scipy.special.expit(F.T @ all_states)
+    return(RA_samples)
+
+def Retro_sampling2(TActual, F, G, mt, Ct, at, Rt, skipped, nSample, family):
+    # F=F_pois; G=G_pois; mt = mt_pois; Ct = Ct_pois; discount =np.array([0.9, 0.95])
+    # at = at_pois; Rt = Rt_pois; skipped = skipped_pois; family = "poisson"
+    # nSample = 2
+    RA_samples = np.zeros((nSample, TActual))
+    # Starting Seed
+    d = G.shape[0]
+    mt_star = mt[: ,(TActual - 1):TActual] @ np.ones((1, nSample))
+    Ct_star = Ct[:,: ,TActual - 1]
+    all_states = np.random.multivariate_normal(mean=np.zeros(d,), cov=Ct_star, \
+                     size=nSample).T + mt_star
+    if (family == "poisson"):
+        RA_samples[:, -1] = np.exp(F.T @ all_states)
+    if (family == "bernoulli"):
+        RA_samples[:, -1] = scipy.special.expit(F.T @ all_states)
+        
+    # Trajectory
+    for t in np.arange(TActual-2, -1, -1):
+        # t = 548
+        
+        if skipped[:,t+1] == 0:
+            Bt = Ct[:,:,t] @ G.T @ scipy.linalg.inv(Rt[:,:,t+1])
+            mt_star = mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
+                       Bt @ (all_states - at[:,  t: (t + 1)] @ np.ones((1, nSample)))
+            Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
+
+                   
+        Ct_star = 0.5*(Ct_star + Ct_star.T)
+                 
+        
+        
+        all_states = np.random.multivariate_normal(mean = np.zeros(d,), \
+                                      cov = Ct_star, \
+                                          size = nSample).T + mt_star
+
+        if (family == "poisson"):
+            RA_samples[:, t] = np.exp(F.T @ all_states)
+        if (family == "bernoulli"):
+            RA_samples[:, t] = scipy.special.expit(F.T @ all_states)
+            
+            
     return(RA_samples)

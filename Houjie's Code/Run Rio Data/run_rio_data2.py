@@ -14,7 +14,7 @@ import matplotlib.colors as mcolors
 
 import random
 from Poisson import FF_Poisson2, RA_Poisson, RA_Poisson2
-from Bernoulli import FF_Bernoulli2, RA_Bernoulli, Retro_sampling
+from Bernoulli import FF_Bernoulli2, RA_Bernoulli, Retro_sampling2
 from Recouple_DGM2 import Recouple_DGM2
 from sklearn.preprocessing import normalize
 #### Load Rio bus data and shapfile 
@@ -159,7 +159,7 @@ period = 48
 G_bern = scipy.linalg.block_diag([[1, 1], 
                                 [0, 1]],
                                 [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
-                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
+                                [-np.sin(2*np.pi/period), np.cos(2*np.pi/period)]])
 
 delta_bern = 0.95  # Discount factor for evolution variance
 # delta_bern = np.diag(np.repeat(delta_bern, len(F_bern)))
@@ -180,16 +180,17 @@ F_pois = np.array([[1],
 G_pois = scipy.linalg.block_diag([[1, 1], 
                                 [0, 1]],
                                 [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
-                                [-np.sin(2*np.pi/period), np.cos(2*np.pi)/period]])
+                                [-np.sin(2*np.pi/period), np.cos(2*np.pi/period)]])
 
 F_pois = np.r_[np.array([[1]]), F_pois]
 G_pois = scipy.linalg.block_diag(1, G_pois)
-delta_pois = 0.95  # Discount factor for evolution variance
-RE_rho_pois = 0.95 # Discount factor for random effect. When = 1, no RE
+delta_pois = 0.98 # Discount factor for evolution variance
+RE_rho_pois = 0.99 # Discount factor for random effect. When = 1, no RE
 # delta_pois = np.diag(np.concatenate((np.array([RE_rho_pois]), \
 #                                       np.repeat(delta_pois, len(F_pois)-1)), axis=0))
 delta_pois = scipy.linalg.block_diag(np.array([(1-RE_rho_pois)/RE_rho_pois]), \
-                        np.matlib.repmat((1-delta_pois)/delta_pois,G_pois.shape[0]-1,G_pois.shape[0]-1))
+                        np.matlib.repmat((1-delta_pois)/delta_pois,2,2),
+                        np.matlib.repmat((1-delta_pois)/delta_pois,2,2))
 
 
 
@@ -224,44 +225,23 @@ for n in range(N):
     mt_bern, Ct_bern, at_bern, Rt_bern, rt_bern, st_bern, skipped_bern = \
     FF_Bernoulli2(F_bern, G_bern, delta_bern, flow_count, n, T0, TActual, eps)
     
-    # mt_bern, Ct_bern, at_bern, Rt_bern, rt_bern, st_bern, skipped_bern = \
-    # FF_Bernoulli(F_bern, G_bern, delta_bern[0,0], flow_count, n, T0, TActual, eps)
-    
       
     # Bern: Retrospective Analysis
-    RA_prob = Retro_sampling(TActual, delta_bern[0:1,0], F_bern, G_bern, mt_bern, \
+    RA_prob = Retro_sampling2(TActual, F_bern, G_bern, mt_bern, \
                       Ct_bern, at_bern, Rt_bern, skipped_bern,\
                       nSample = nSample, family="bernoulli")
             
-    # [sat_bern, sRt_bern, ssrt_bern, ssst_bern, RA_prob] = \
-    #     RA_Bernoulli(TActual, F_bern, G_bern, mt_bern, \
-    #                   Ct_bern, at_bern, Rt_bern, skipped_bern,\
-    #                   nSample = nSample)
-   
     
     # # Forward Filtering
     [mt_pois, Ct_pois, at_pois, Rt_pois, rt_pois, ct_pois, skipped_pois] = \
         FF_Poisson2(F_pois, G_pois, delta_pois, flow_count, n, mN, T0, TActual, \
                     eps, RE_rho_pois, conditional_shift_pois)
-            
-    # a = np.zeros((TActual, ))
-    # for t in range(TActual):
-    #     # t = 6
-    #     a[t] = scipy.linalg.det(Ct_pois[:,:,t])
+              
     
-    # RA_rate = Retro_sampling(TActual, np.array([0.95]), F_pois, G_pois, mt_pois, \
-    #                   Ct_pois, at_pois, Rt_pois, skipped_bern,\
-    #                   nSample = nSample, family="poisson")
-        
-    # # # Retrospective Analysis
-    # [sat_pois, sRt_pois, ssrt_pois, ssct_pois, RA_rate] = \
-    #     RA_Poisson(TActual, F_pois, G_pois, mt_pois, \
-    #                 Ct_pois, at_pois, Rt_pois, skipped_pois,
-    #                 nSample = nSample)
-    
-    # RA_rate = RA_Poisson2(TActual, delta_pois, F_pois, G_pois, mt_pois, \
-    #                   Ct_pois, at_pois, Rt_pois, skipped_pois,\
-    #                   nSample = nSample)
+    RA_rate = Retro_sampling2(TActual, F_pois, G_pois, mt_pois, \
+                      Ct_pois, at_pois, Rt_pois, skipped_pois,\
+                      nSample = nSample, family="poisson")
+           
         
     # Store them
     rt_bern_all[:, n] = rt_bern
@@ -274,7 +254,7 @@ for n in range(N):
     # ssrt_pois_all[:, n] = ssrt_pois
     # ssst_pois_all[:, n] = ssct_pois
     bern_sample[:,:, n] = RA_prob
-    # pois_sample[:,:, n] = RA_rate
+    pois_sample[:,:, n] = RA_rate
     
 
 # Decompose fitted data

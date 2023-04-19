@@ -132,7 +132,7 @@ def FF_Poisson2(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_
     # Too bad matlab cannot assign default value as I do in R
     
     # F = F_pois; G = G_pois; delta = delta_pois; RE_rho = RE_rho_pois; conditional_shift = conditional_shift_pois;
-    
+    # flow = flow_count
     # F = np.r_[np.array([[1]]), F]
     # G = block_diag(0, G)
     d1, d2 = G.shape
@@ -206,11 +206,11 @@ def FF_Poisson2(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_
                 Rt[:,:,t] = Rt[:,:,t] + Rt[:,:,t] * delta
             
             ft[:, t]      = F.T @ at[:,t]
-            qt[:, t]      = F[1:3].T @ Rt[1:3,1:3,t] @ F[1:3] # just for clarity
+            qt[:, t]      = F.T @ Rt[:,:,t] @ F # just for clarity
             
             # Random effect
             # Rt[0,0,t] = qt[:, t] * (1-delta[0,0]) / delta[0,0] # vt
-            qt[:, t]  = qt[:, t] + Rt[0,0,t] # % p.31 qt + vt. to revisit param
+            # qt[:, t]  = qt[:, t] + Rt[0,0,t] # % p.31 qt + vt. to revisit param
             
             # Get numerical root of Gamma approximation
 # =============================================================================
@@ -229,7 +229,6 @@ def FF_Poisson2(F, G, delta, flow, n, mN, T0, TActual, eps, RE_rho, conditional_
             sqt[:, t] = special.polygamma(1, rt[:, t]+xt[T0+t])
             mt[:,t] = at[:,t] + Rt[:,:,t] @ F @ (sft[:, t]-ft[:, t])/qt[:, t]
             Ct[:,:,t] = Rt[:,:,t]-Rt[:,:,t] @ F @ (F.T) @ Rt[:,:,t] * (1-sqt[:, t]/qt[:, t])/qt[:, t]
-            Ct[:,:,t] = 0.5*(Ct[:,:,t] + Ct[:,:,t].T)
             Ct[:,:,t] = 0.5*(Ct[:,:,t] + Ct[:,:,t].T)
     return mt, Ct, at, Rt, rt, ct, skipped
 
