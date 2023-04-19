@@ -19,6 +19,7 @@ from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
 from BK_functions import RA_Poisson_BK, RA_Bernoulli_BK, FF_Poisson_BK, FF_Bernoulli_BK
+from SimulatePath import SimulatePath
 
 #### Load Rio bus data and shapfile 
 
@@ -50,7 +51,7 @@ bus_subgrid = busData[(-43.3 <= busData.longitude) & (busData.longitude <= -43.2
     (-23 <= busData.latitude) & (busData.latitude <= -22.8)]
 busline_subgrid = np.unique(bus_subgrid.line)
 
-days = 5
+days = 1
 bus_date = pd.date_range('02-18-2019', periods=days, freq='24h').strftime('%m-%d-%Y')
 sub_bus = busData[np.isin(np.array(busData.line), busline_subgrid[0: 20]) &  \
                   np.isin(busData.date, bus_date) \
@@ -268,6 +269,7 @@ for n in range(N):
 
 
 ra_bern_mean = np.mean(bern_sample, 0)
+ra_bern_mean[ra_bern_mean > 1] = .999
 ra_bern_upper = np.quantile(bern_sample, .975, 0)
 ra_bern_lower = np.quantile(bern_sample, .025, 0)
 
@@ -277,6 +279,8 @@ ra_pois_lower = np.quantile(pois_sample, .025, 0)
 
 ff_pois_mean = ssrt_pois_all / ssst_pois_all
 ff_bern_mean = ssrt_bern_all / (ssrt_bern_all + ssst_bern_all)
+
+SimulatePath(26, 0, TActual, ra_bern_mean, ra_pois_mean, unique_edges)
 
 # # Compute transition probabilities
 # nSample = 5

@@ -2,6 +2,7 @@ import numpy as np
 
 def SimulatePath(start_location, start_time, end_time, bernoulli_mean, poisson_mean, 
                  unique_edges):
+    N = unique_edges[0]
     path = np.zeros(end_time - start_time)
     i = 0
     possible_steps = [n for n in np.arange(0, N) if unique_edges[n, 0] == start_location]
@@ -13,6 +14,7 @@ def SimulatePath(start_location, start_time, end_time, bernoulli_mean, poisson_m
             path[i] = location
             i = i + 1
             continue
+        """ Z = np.ones(len(possible_steps)) """
         ##############################################################
         z_possible = [n for n, z in zip(realized_edges, Z) if z == 1]
         rates = poisson_mean[:, n][z_possible]
