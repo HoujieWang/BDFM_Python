@@ -84,15 +84,24 @@ def GetTransitionProbs(unique_edges, bern_mean, pois_mean, TActual, N):
 
         all_z = [[0, 1]] * len(receivers)
         all_z = list(itertools.product(*all_z))
-        all_z = pd.DataFrame(all_z).drop(0)
+        all_z1 = pd.DataFrame(all_z).drop(0)
+
+        all_z0 = 1 - all_z1
 
         for t in np.arange(0, TActual):
             bern_probs = bern_mean[t, :][receivers]
 
-            Z_probs = (all_z.apply(lambda x: x * np.log(bern_probs), axis = 1)
+            Z1_probs = (all_z1.apply(lambda x: x * np.log(bern_probs), axis = 1)
             .apply(lambda x: np.sum(x), axis = 1)
-            .apply(lambda x: np.exp(x))
+            #.apply(lambda x: np.exp(x))
             )
+
+            Z0_probs = (all_z0.apply(lambda x: x * np.log(1 - bern_probs), axis = 1)
+            .apply(lambda x: np.sum(x), axis = 1)
+            #.apply(lambda x: np.exp(x))
+            )
+
+            Z_probs = np.exp(Z1_probs + Z0_probs)
             Z_probs = Z_probs/sum(Z_probs)
 
             pois_rates = pois_mean[t, :][receivers]
@@ -107,3 +116,5 @@ def GetTransitionProbs(unique_edges, bern_mean, pois_mean, TActual, N):
             transition_probs[t, receivers] = integrate_z
 
     return(transition_probs)
+
+bus_location[8,:]
