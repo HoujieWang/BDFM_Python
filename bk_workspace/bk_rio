@@ -12,9 +12,11 @@ import matplotlib.pyplot as plt
 import matplotlib.dates
 import matplotlib.colors as mcolors
 from sklearn.preprocessing import normalize
+import importlib
 
 import random
 os.chdir("bk_workspace/Utilities")
+#importlib.reload(SimulatePath.SimulatePath)
 from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
@@ -164,7 +166,7 @@ G_bern = scipy.linalg.block_diag([[1, 1],
                                 [[np.cos(2*np.pi/period), np.sin(2*np.pi/period)],
                                 [-np.sin(2*np.pi/period), np.cos(2*np.pi/period)]])
 
-delta_bern = 0.95  # Discount factor for evolution variance
+delta_bern = 0.99  # Discount factor for evolution variance
 sampleSize_bern = 100 # Sample size of posterior and predictions
 
 # Poisson
@@ -188,9 +190,9 @@ G_pois = scipy.linalg.block_diag(0, G_pois)
 delta_pois = 0.99  # Discount factor for evolution variance
 RE_rho_pois = .9 # Discount factor for random effect. When = 1, no RE
 conditional_shift_pois = 1 # Shift of conditional Poisson
-sampleSize_pois = 1000 # Sample size of posterior and predictions
+sampleSize_pois = 100 # Sample size of posterior and predictions
 
-sampleSize_dgm = 500
+sampleSize_dgm = 100
 # Fit all individual dynamic models
 phi_samp = np.zeros((N, TActual, sampleSize_dgm))
 
@@ -229,18 +231,18 @@ for n in range(N):
     # ed - st
 
     # Retrospective Analysis
-    st = time.time()
+    """     st = time.time()
     [sat_bern, sRt_bern, ssrt_bern, ssst_bern, RA_prob] = \
         RA_Bernoulli(TActual, F_bern, G_bern, mt_bern, \
                      Ct_bern, at_bern, Rt_bern, skipped_bern,\
                      nSample = nSample)
     ed = time.time()
     # ed - st
-    
+
     [sat_pois, sRt_pois, ssrt_pois, ssct_pois, RA_rate] = \
         RA_Poisson(TActual, F_pois, G_pois, mt_pois, \
                    Ct_pois, at_pois, Rt_pois, skipped_pois,
-                   nSample = nSample)
+                   nSample = nSample) """
     
     # BK Retrospective_BK
     prob_samps = RA_Bernoulli_BK(TActual, F_bern, G_bern, mt_bern, \
@@ -250,24 +252,24 @@ for n in range(N):
                    Ct_pois, at_pois, Rt_pois, skipped_pois,
                    nSample = nSample)
     
-    # Troubleshooting
-    [F, G, mt, Ct, at, Rt, skipped, RE_rho, delta, flow] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, 
-                                                      Rt_pois, skipped_pois, RE_rho_pois, delta_pois, flow_count]
-    [F, G, mt, Ct, at, Rt, skipped] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern, skipped_bern]
     # Store them
     rt_bern_all[:, n] = rt_bern
     st_bern_all[:, n] = st_bern
     rt_pois_all[:, n] = rt_pois
     st_pois_all[:, n] = ct_pois
 
-    ssrt_bern_all[:, n] = ssrt_bern
+    """ssrt_bern_all[:, n] = ssrt_bern
     ssst_bern_all[:, n] = ssst_bern
     ssrt_pois_all[:, n] = ssrt_pois
-    ssst_pois_all[:, n] = ssct_pois
+    ssst_pois_all[:, n] = ssct_pois """
+
     bern_sample[:, :, n] = prob_samps
     pois_sample[:, :,  n] = rate_samps
 
-
+"""    # Troubleshooting
+    [F, G, mt, Ct, at, Rt, skipped, RE_rho, delta, flow] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, 
+                                                      Rt_pois, skipped_pois, RE_rho_pois, delta_pois, flow_count]
+    [F, G, mt, Ct, at, Rt, skipped] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern, skipped_bern] """
 ra_bern_mean = np.mean(bern_sample, 0)
 ra_bern_mean[ra_bern_mean > 1] = .999
 ra_bern_upper = np.quantile(bern_sample, .975, 0)
@@ -277,10 +279,11 @@ ra_pois_mean = np.mean(pois_sample, 0)
 ra_pois_upper = np.quantile(pois_sample, .975, 0)
 ra_pois_lower = np.quantile(pois_sample, .025, 0)
 
-ff_pois_mean = ssrt_pois_all / ssst_pois_all
-ff_bern_mean = ssrt_bern_all / (ssrt_bern_all + ssst_bern_all)
+ff_pois_mean = rt_pois_all / st_pois_all
+ff_bern_mean = rt_bern_all / (rt_bern_all + st_bern_all)
 
-SimulatePath(26, 0, TActual, ra_bern_mean, ra_pois_mean, unique_edges)
+path_sims = 1000
+paths = [SimulatePath(26, 0, TActual, ra_bern_mean, ra_pois_mean, unique_edges) for sim in np.arange(0, path_sims)]
 
 # # Compute transition probabilities
 # nSample = 5
