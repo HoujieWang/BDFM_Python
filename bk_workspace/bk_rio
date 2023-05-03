@@ -13,6 +13,8 @@ import matplotlib.dates
 import matplotlib.colors as mcolors
 from sklearn.preprocessing import normalize
 import importlib
+import sys
+import itertools
 
 import random
 os.chdir("bk_workspace/Utilities")
@@ -21,7 +23,14 @@ from Poisson import FF_Poisson, RA_Poisson
 from Bernoulli import FF_Bernoulli, RA_Bernoulli
 from Recouple_DGM2 import Recouple_DGM2
 from BK_functions import RA_Poisson_BK, RA_Bernoulli_BK, FF_Poisson_BK, FF_Bernoulli_BK
-from SimulatePath import SimulatePath
+from SimulatePath import SimulatePath, SimulatePath2
+
+
+
+""" del sys.modules['SimulatePath']
+os.chdir("bk_workspace/Utilities")
+from SimulatePath import SimulatePath, SimulatePath2
+os.chdir("../..") """
 
 #### Load Rio bus data and shapfile 
 
@@ -208,8 +217,8 @@ ssrt_pois_all = np.zeros((TActual, N))
 ssst_pois_all = np.zeros((TActual, N))
 
 nSample = 100
-pois_sample = np.zeros((nSample, TActual, N))
-bern_sample = np.zeros((nSample, TActual, N))
+pois_samps = np.zeros((nSample, TActual, N))
+bern_samps = np.zeros((nSample, TActual, N))
 st = time.time()
 for n in range(N):
     # n = 0
@@ -263,27 +272,32 @@ for n in range(N):
     ssrt_pois_all[:, n] = ssrt_pois
     ssst_pois_all[:, n] = ssct_pois """
 
-    bern_sample[:, :, n] = prob_samps
-    pois_sample[:, :,  n] = rate_samps
+    bern_samps[:, :, n] = prob_samps
+    pois_samps[:, :,  n] = rate_samps
 
 """    # Troubleshooting
     [F, G, mt, Ct, at, Rt, skipped, RE_rho, delta, flow] = [F_pois, G_pois, mt_pois, Ct_pois, at_pois, 
                                                       Rt_pois, skipped_pois, RE_rho_pois, delta_pois, flow_count]
     [F, G, mt, Ct, at, Rt, skipped] = [F_bern, G_bern, mt_bern, Ct_bern, at_bern, Rt_bern, skipped_bern] """
-ra_bern_mean = np.mean(bern_sample, 0)
-ra_bern_mean[ra_bern_mean > 1] = .999
-ra_bern_upper = np.quantile(bern_sample, .975, 0)
-ra_bern_lower = np.quantile(bern_sample, .025, 0)
+bern_mean = np.mean(bern_samps, 0)
+bern_mean[ra_bern_mean > 1] = .999
+ra_bern_upper = np.quantile(bern_samps, .975, 0)
+ra_bern_lower = np.quantile(bern_samps, .025, 0)
 
-ra_pois_mean = np.mean(pois_sample, 0)
-ra_pois_upper = np.quantile(pois_sample, .975, 0)
-ra_pois_lower = np.quantile(pois_sample, .025, 0)
+pois_mean = np.mean(pois_samps, 0)
+ra_pois_upper = np.quantile(pois_samps, .975, 0)
+ra_pois_lower = np.quantile(pois_samps, .025, 0)
 
 ff_pois_mean = rt_pois_all / st_pois_all
 ff_bern_mean = rt_bern_all / (rt_bern_all + st_bern_all)
 
-path_sims = 1000
-paths = [SimulatePath(26, 0, TActual, ra_bern_mean, ra_pois_mean, unique_edges) for sim in np.arange(0, path_sims)]
+sim_paths = SimulatePath(26, 0, 3, bern_samps, pois_samps, unique_edges)
+sim_paths = SimulatePath2(54, 20, 23, bern_mean, pois_mean, unique_edges, 100)
+sim_strings = [str(row) for row in sim_paths]
+uniques = pd.Series(np.unique(sim_strings))
+path_probs = uniques.apply(lambda x: np.mean([string == x for string in sim_strings]))
+
+
 
 # # Compute transition probabilities
 # nSample = 5
@@ -457,6 +471,53 @@ for i in unique_nodes[temp_idx[range(3)]]:
                 xmin = rio_grid[i, 0], 
                 xmax = rio_grid[i, 0]+cell_size,
             colors = 'red', linewidth = 1)
+# bus_plot.set_title("Trajectory of 20 buses from 01/25-02/09")
+# plt.savefig('Rio_map.pdf')
+plt.show()
+
+
+
+bus_plot = rio.plot(alpha=0.2)
+k = 0
+for i in np.arange(0, sim_paths.shape[0]):
+    # i = 6
+    sim = sim_paths[i, :]
+    lat = rio_grid[sim.astype(int), 0]
+    long = rio_grid[sim.astype(int), 1]
+    plt.plot(lat, long, linestyle = "-", markersize=1, alpha = .01)
+plt.show()
+    
+for i in range(rio_grid.shape[0]):
+    plt.vlines(x = rio_grid[i, 0], ymin = np.min(rio_grid[:, 1]), 
+                ymax =  np.max(rio_grid[:, 1]),
+            colors = 'grey', linewidth = 0.1)
+    plt.hlines(y = rio_grid[i, 1], xmin = np.min(rio_grid[:, 0]), 
+                xmax =  np.max(rio_grid[:, 0]),
+            colors = 'grey', linewidth = 0.1)
+
+for i in unique_nodes:
+    plt.text(rio_grid[i, 0]+cell_size*0.1, rio_grid[i, 1]+cell_size*0.1,\
+    str(i), size = 5)
+    
+
+""" for i in unique_nodes[temp_idx[range(3)]]:
+    plt.vlines(x = rio_grid[i, 0], 
+                ymin = rio_grid[i, 1], 
+                ymax = rio_grid[i, 1]+cell_size,
+            colors = 'red', linewidth = 1)
+    plt.vlines(x = rio_grid[i, 0]+cell_size, 
+                ymin = rio_grid[i, 1], 
+                ymax = rio_grid[(i+1), 1]+cell_size,
+            colors = 'red', linewidth = 1)
+    
+    plt.hlines(y = rio_grid[i, 1], 
+                xmin = rio_grid[i, 0], 
+                xmax = rio_grid[i, 0]+cell_size,
+            colors = 'red', linewidth = 1)
+    plt.hlines(y = rio_grid[i, 1]+cell_size, 
+                xmin = rio_grid[i, 0], 
+                xmax = rio_grid[i, 0]+cell_size,
+            colors = 'red', linewidth = 1) """
 # bus_plot.set_title("Trajectory of 20 buses from 01/25-02/09")
 # plt.savefig('Rio_map.pdf')
 plt.show()
