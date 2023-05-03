@@ -2,10 +2,11 @@ import numpy as np
 import pandas as pd
 import itertools
 
-""" At the moment, these functions use posterior means of the Bernoulli
+"""
+At the moment, these functions use posterior means of the Bernoulli
 and Poisson retrospective distributions. Changing "simulate_path" for use with the
 retrospective samples should be easy. Changing the "transition_probs" function might be harder. 
- """
+"""
 
 def simulate_path(start_location, start_time, end_time, bern_mean, pois_mean, 
                  unique_edges, sims):
@@ -46,7 +47,6 @@ def trasition_probs_exact(unique_edges, bern_mean, pois_mean, TActual, N):
 
         # Remove case when z = 0 for all paths
         all_z1 = pd.DataFrame(all_z).drop(0)
-
         all_z0 = 1 - all_z1
 
         for t in np.arange(0, TActual):
@@ -64,7 +64,7 @@ def trasition_probs_exact(unique_edges, bern_mean, pois_mean, TActual, N):
 
             # Combine and renormalize
             Z_probs = np.exp(Z1_probs + Z0_probs)
-            Z_probs = Z_probs/sum(Z_probs)
+            Z_probs = Z_probs/sum(Z_probs) # Because we got rid of the 0 case
 
             # Transition probs conditional on each possible Z
             pois_rates = pois_mean[t, :][receivers]
@@ -86,7 +86,8 @@ def trasition_probs_sim(unique_edges, bern_mean, pois_mean, TActual, N, sims):
     transition_probs = np.zeros((TActual, N))
 
     for sender in senders:
-        receivers = [n for n in np.arange(0, N) if unique_edges[n, 0] == sender]
+        receivers_index = [n for n in np.arange(0, N) if unique_edges[n, 0] == sender]
+        possible_steps = unique_edges[receivers_index, 1]
 
         for t in np.arange(0, TActual):
             steps = np.zeros(sims)
@@ -95,15 +96,15 @@ def trasition_probs_sim(unique_edges, bern_mean, pois_mean, TActual, N, sims):
                 # Condition away case where all Z are 0
                 Z = np.zeros(len(receivers))
                 while all(z == 0 for z in Z):
-                    Z = [np.random.binomial(1, bern_mean[t, n]) for n in receivers]
+                    Z = [np.random.binomial(1, bern_mean[t, n]) for n in receivers_index]
 
-                z_possible = [n for n, z in zip(receivers, Z) if z == 1]
+                z_possible = [n for n, z in zip(receivers_index, Z) if z == 1]
                 rates = pois_mean[t, :][z_possible]
                 probs = rates / sum(rates)
-                location_index = np.random.choice(z_possible, 1, True, probs)
-                location = unique_edges[location_index, 1]
-                steps[s] = location
-            thing = pd.Categorical(steps, categories=unique_edges[receivers, 1])
-            probs = thing.value_counts()/sims
-            transition_probs[t, receivers] = probs
+                step_index = np.random.choice(z_possible, 1, True, probs)
+                steps[s] = unique_edges[step_index, 1]
+            probs = (pd.Categorical(steps, categories = possible_steps)
+                    .value_counts()/sims
+            )
+            transition_probs[t, receivers_index] = probs
     return(transition_probs)
