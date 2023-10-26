@@ -278,7 +278,7 @@ for t in np.arange(ed_time, agent_location_i.shape[0]-1):
     # if not just use prior
     if ((np.sum(trn_nodes == last_location) == 0) | \
         ( agent_location_i[(idx % oneday_obs)] != agent_location_i[t])):
-        all_piFF = np.repeat(pr_prob, nflow)
+        piFF = np.repeat(pr_prob, nflow)
         
         
         trn_next_zones = np.argsort(dist_mat[last_location,:])[0, :nflow].astype(int)
@@ -287,13 +287,13 @@ for t in np.arange(ed_time, agent_location_i.shape[0]-1):
                               args = (all_f[i], all_q[i]), \
                               bounds = ((0, 0), (float("inf"),float("inf")))).x \
                               for i in range(nflow)])
-        all_piFF = beta_parmFF[:,0] / np.sum(beta_parmFF, axis=1)
+        piFF = beta_parmFF[:,0] / np.sum(beta_parmFF, axis=1)
         trn_next_zones = trn_node_order[trn_node_order[:,0] == last_location, 1:][0,:].astype(int)
     
-    transition_probFF = np.array([1 - all_piFF[0]] + \
-                               [np.prod(all_piFF[:i])*(1-all_piFF[i]) \
+    transition_probFF = np.array([1 - piFF[0]] + \
+                               [np.prod(piFF[:i])*(1-piFF[i]) \
                                 for i in np.arange(1, nflow)] + \
-                                   [np.prod(all_piFF)])
+                                   [np.prod(piFF)])
     
     full_probFF = np.zeros((total_zones, )) + transition_probFF[-1] / (total_zones - nflow)
     full_probFF[trn_next_zones] = transition_probFF[:nflow]
@@ -305,12 +305,12 @@ for t in np.arange(ed_time, agent_location_i.shape[0]-1):
                           args = (RA_mu[i], RA_var[i]), \
                           bounds = ((0, 0), (float("inf"),float("inf")))).x \
                           for i in range(nflow)])
-    all_piRA = beta_parmRA[:,0] / np.sum(beta_parmRA, axis=1)
+    piRA = beta_parmRA[:,0] / np.sum(beta_parmRA, axis=1)
     
-    transition_probRA = np.array([1 - all_piRA[0]] + \
-                               [np.prod(all_piRA[:i])*(1-all_piRA[i]) \
+    transition_probRA = np.array([1 - piRA[0]] + \
+                               [np.prod(piRA[:i])*(1-piRA[i]) \
                                 for i in np.arange(1, nflow)] + \
-                                   [np.prod(all_piRA)])
+                                   [np.prod(piRA)])
     tst_next_zones = tst_node_order[tst_node_order[:,0] == last_location, 1:][0,:]
     
         

@@ -122,12 +122,9 @@ phi_t = phi_t.reshape(1, len(phi_t))
 #     # lambda_jointRA[i, :, :] = RA_summary[0][:, -ed_time:]
     
 
-def spatialDBCM(y, X=[], F = np.array([1,1,0]), nPeriod=96, nSeries = 14,\
-                G_list=[np.array([[1]]), \
-                        np.array([[np.cos(2*np.pi/nPeriod), np.sin(2*np.pi/nPeriod)],\
-                                  [-np.sin(2*np.pi/nPeriod), np.cos(2*np.pi/nPeriod)]])], \
-                delta = np.repeat(1, len(G_list)+len(X)),\
-                delta5 = np.arange(0.9, 1.01, 0.02), ed_time=[]):
+def spatialDBCM(y, X=[], F = np.array([1, 1, 0]), \
+                delta = np.array([1, 1, 1]), \
+                nPeriod=96, nSeries = 5, ed_time=[], RA_prob = True, FF_prob = True, pr_var = 0.1):
     # y: a T by 1 matrix with each entry representing the zone index of the agent
     # X: a list of additional covariates, each covariate should be 1 by T
     # F: a vector of baseline predictors, default choice is intercept + seasonal component
@@ -135,16 +132,24 @@ def spatialDBCM(y, X=[], F = np.array([1,1,0]), nPeriod=96, nSeries = 14,\
     # delta: a vector of discount factor for each component, 
     # this has to be satisfied:len(delta)=len(X) + len(F)
         
-    # y = np.concatenate([agent_location_i[0:1,0:1], \
-    #     np.vstack([agent_location_i[1:97,:] for i in range(7)])])
-    # ed_time=[]; nSeries = 10
-    # X = []; delta5 = np.array([1, 1, 1, 1])
-    # F = np.array([1,0]); 
-    # G_list=[np.array([[np.cos(2*np.pi/nPeriod), np.sin(2*np.pi/nPeriod)],\
-    #                   [-np.sin(2*np.pi/nPeriod), np.cos(2*np.pi/nPeriod)]])]
+    # y = y_i.reshape(-1, 1);
+    # nSeries = 12;
+    # nPeriod = int(96/scale);
+    # X = [occu_ratio,111*trans_dist];
+    # F = np.array([1,1,0]);
+    # delta = np.repeat(0.8,4);
+    # FF_prob = False;
+    # pr_var = pr_var
+    # ed_time=[]
+    # RA_prob = False; FF_prob = True
     
     if len(ed_time) == 0:
         ed_time =y.shape[0]-1
+    
+    G_list=[np.array([[1]]), \
+            np.array([[np.cos(2*np.pi/nPeriod), np.sin(2*np.pi/nPeriod)],\
+                      [-np.sin(2*np.pi/nPeriod), np.cos(2*np.pi/nPeriod)]])]
+    
         
     G_list_Xpart = [np.array([[1]]) for i in range(len(X))]
     G_list_Xpart.extend(G_list)
@@ -155,90 +160,92 @@ def spatialDBCM(y, X=[], F = np.array([1,1,0]), nPeriod=96, nSeries = 14,\
     trn_nodes = np.unique(agent_location_i[:ed_time+1, :])
     F_bern = np.repeat(F, trn_flow_i.shape[1]).reshape(len(F), trn_flow_i.shape[1])
     
-    X.append(F_bern)
-    F_bern = np.vstack(X)
+    # X.append(F_bern)
+    # F_bern = np.vstack(X)
     
+    delta = np.concatenate([delta, np.repeat(1, len(G_list_Xpart)-len(delta))])
     delta_bern = scipy.linalg.block_diag(*[np.matlib.repmat((1-delta[i])/delta[i],\
                                                             G_list_Xpart[i].shape[0],G_list_Xpart[i].shape[0]) \
                                             for i in range(len(G_list_Xpart))])
      
     nflow = trn_flow_i.shape[0]
-    # delta_ii = np.zeros((nflow, ))
-    # delta_ii[:len(delta5)] = delta5
-    # delta_ii[len(delta5):] = delta5[-1]
+    
     final_mt = np.zeros((G_bern.shape[0], nflow))
     final_Ct = np.zeros((nflow, G_bern.shape[0], G_bern.shape[0]))
-    # lambda_jointRA = np.zeros((nflow, 2, \
-    #                           agent_location_i.shape[0]-ed_time-1))
     retro_moments = [None]*nflow
     forwd_parm = [None]*nflow
     for ii in range(nflow):
-        # ii = 1
-        # delta_bern = scipy.linalg.block_diag(*[np.matlib.repmat((1-delta[i]*delta_ii[ii])/(delta[i]*delta_ii[ii]),\
-        #                                                         G_list_Xpart[i].shape[0],G_list_Xpart[i].shape[0]) \
-        #                                        for i in range(len(G_list_Xpart))])
-        # temp = trn_flow_i[[ii],:]
-        # temp[0,15:30] = 1
+        # ii = 0
+        if len(X) > 0:
+            F_ii = np.vstack([np.array([X[j][:,ii] for j in range(len(X))]),\
+                          F_bern])
+        else:
+            F_ii = F_bern
+                
         mt, Ct, at, Rt, rt, st, skipped = \
-            FF_Bernoulli2(F_bern, G_bern, delta_bern,  trn_flow_i[[ii],:], pr_prob)
+            FF_Bernoulli2(F_ii, G_bern, delta_bern,  trn_flow_i[[ii],:], pr_var = pr_var)
         
-        
-        # raw_pi = rt/(rt+st)
-        # plt.plot(raw_pi.T)
-        # raw_pi[:,np.where(trn_flow_i[[ii],:] == 0)[1]]
+     
         forwd_parm[ii] = np.vstack([rt,st])
         
-        # final_mt[:, ii] = mt[:, ed_time-1]
-        # final_Ct[ii, :, :] = Ct[:, :, ed_time-1]
-        
-        RA_summary = Retro_sampling(at.shape[1], F_bern, G_bern, \
+               
+        RA_summary = Retro_sampling(at.shape[1], F_ii, G_bern, \
                         mt, Ct, at, Rt, \
                         nSample = 500, family = "none")
         retro_moments[ii] = RA_summary[0][:, :ed_time]
-        # lambda_jointRA[i, :, :] = RA_summary[0][:, -ed_time:]
         
     
     trans_probRA = np.zeros((retro_moments[0].shape[1], ))
     trans_probFF = np.zeros((retro_moments[0].shape[1], ))
     all_piRA = np.zeros((retro_moments[0].shape[1], nflow))
     all_piFF = np.zeros((retro_moments[0].shape[1], nflow))
+    all_beta_parm = np.zeros((nflow, 2, retro_moments[0].shape[1]))
+    piFF = np.zeros((nflow, ))
     for t in range(retro_moments[0].shape[1]):
-    # for t in range(30):
-        # t = 31
+        # t = 0
         last_location = agent_location_i[t,0]
         
-        
-        all_f  = np.array([retro_moments[ii][0,t] for ii in range(nflow)])
-        all_q  = np.array([retro_moments[ii][1,t] for ii in range(nflow)])
-        
-        
-        
-        beta_parmRA = np.array([least_squares(bern_eq, np.array([1, 1]), \
-                              args = (all_f[i], all_q[i]), \
-                              bounds = ((0, 0), (float("inf"),float("inf")))).x \
-                              for i in range(nflow)])
-        piRA = beta_parmRA[:,0] / np.sum(beta_parmRA, axis=1)
-        all_piRA[t, :] = piRA
         trn_next_zones = trn_node_order[trn_node_order[:,0] == last_location, 1:][0,:].astype(int)
-    
-        transition_probRA = np.array([1 - piRA[0]] + \
-                                   [np.prod(piRA[:i])*(1-piRA[i]) \
-                                    for i in np.arange(1, nflow)] + \
-                                       [np.prod(piRA)])
-            
-        piFF = np.array([forwd_parm[ii][:,t] for ii in range(nflow)])
-        piFF = piFF[:,0] / np.sum(piFF, axis=1)
-        all_piFF[t, :] = piFF
-        transition_probFF = np.array([1 - piFF[0]] + \
-                                   [np.prod(piFF[:i])*(1-piFF[i]) \
-                                    for i in np.arange(1, nflow)] + \
-                                       [np.prod(piFF)])
         
-        trans_probRA[t] = transition_probRA[np.where(agent_location_i[t+1,0] == trn_next_zones)[0][0]]
-        trans_probFF[t] = transition_probFF[np.where(agent_location_i[t+1,0] == trn_next_zones)[0][0]]
+        
+        
+        
+        
+        if RA_prob:
+            all_f  = np.array([retro_moments[ii][0,t] for ii in range(nflow)])
+            all_q  = np.array([retro_moments[ii][1,t] for ii in range(nflow)])
+            beta_parmRA = np.array([least_squares(bern_eq, np.array([1, 1]), \
+                                  args = (all_f[i], all_q[i]), \
+                                  bounds = ((0, 0), (float("inf"),float("inf")))).x \
+                                  for i in range(nflow)])
+            all_beta_parm[:,:,t] = beta_parmRA
+            piRA = beta_parmRA[:,0] / np.sum(beta_parmRA, axis=1)
+            all_piRA[t, :] = piRA
+            
+        
+            transition_probRA = np.array([1 - piRA[0]] + \
+                                       [np.prod(piRA[:i])*(1-piRA[i]) \
+                                        for i in np.arange(1, nflow)] + \
+                                           [np.prod(piRA)])
+            trans_probRA[t] = transition_probRA[np.where(agent_location_i[t+1,0] == trn_next_zones)[0][0]]
+            
+        if FF_prob:
+            beta_parmFF = np.array([forwd_parm[ii][:,t] for ii in range(nflow)])
+            denominator = np.sum(beta_parmFF, axis=1)
+            temp_idx = np.where(denominator > 0)[0]
+            piFF[temp_idx] = beta_parmFF[temp_idx,0] / denominator[temp_idx]
+            
+            
+            all_piFF[t, :] = piFF
+            transition_probFF = np.array([1 - piFF[0]] + \
+                                       [np.prod(piFF[:i])*(1-piFF[i]) \
+                                        for i in np.arange(1, nflow)] + \
+                                           [np.prod(piFF)])
+            trans_probFF[t] = transition_probFF[np.where(agent_location_i[t+1,0] == trn_next_zones)[0][0]]
+        
         
 
-    return trans_probRA, trans_probFF, all_piRA, all_piFF
+    return trans_probRA, trans_probFF, all_piRA, all_beta_parm
         
 nn = 10
 all_trans_probRA1 = np.zeros((nn, ed_time))

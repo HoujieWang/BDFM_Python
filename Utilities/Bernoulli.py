@@ -282,7 +282,6 @@ def Retro_sampling(TActual, F, G, mt, Ct, at, Rt, nSample, family, discount=[]):
         # mt_star = (1 - discount) * mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
         #     discount * G_inv @ all_states
         # Ct_star = (1 - discount) * Ct[:, :, t]
-        print(t)
         Bt = Ct[:,:,t] @ G.T @ scipy.linalg.inv(Rt[:,:,t+1])
         mt_star = mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
                     Bt @ (all_states - at[:,  (t+1): (t+2)] @ np.ones((1, nSample)))
@@ -316,7 +315,7 @@ def Retro_sampling(TActual, F, G, mt, Ct, at, Rt, nSample, family, discount=[]):
     return [np.array([lambda_mu, lambda_var]), RA_samples]
 
      
-def FF_Bernoulli2(F, G, delta, zt, pr_prob, nt=[]):
+def FF_Bernoulli2(F, G, delta, zt, nt=[], pr_var = 0.1, no_data_update = False):
     if (len(nt) == 0): 
         nt=np.repeat(1, zt.shape[1])
     # F = F_bern; G = G_bern; delta = delta_bern
@@ -345,7 +344,7 @@ def FF_Bernoulli2(F, G, delta, zt, pr_prob, nt=[]):
     #                           np.zeros((F.shape[0]-3, ))])
     a0 = np.zeros((d2, ))
     mt[:, 0] = np.linalg.inv(G) @ a0
-    Ct[:, :, 0] = 0.1*np.eye(d2)
+    Ct[:, :, 0] = pr_var*np.eye(d2)
     # Forward filtering: Bernoulli
     # count = 0
     for t in range(TActual):
@@ -378,6 +377,20 @@ def FF_Bernoulli2(F, G, delta, zt, pr_prob, nt=[]):
             # count+=1
             at[:,t]   = G @ mt[:,t]
             Rt[:,:,t] = G @ Ct[:,:,t] @ G.T
+            
+            if no_data_update:
+                ft[:, t]     = F[:,t:(t+1)].T @ at[:,t]
+                qt[:, t]     = F[:,t:(t+1)].T @ Rt[:,:,t] @ F[:,t:(t+1)]
+                
+                xnew = least_squares(bern_eq, [1, 1], \
+                                      args = (ft[0, t], qt[0, t]), \
+                                      bounds = ((0, 0), (float("inf"), float("inf"))))
+                rt[:,t]  = xnew.x[0]
+                st[:,t]  = xnew.x[1]
+            else:
+                rt[:, t] = rt[:, t-1]
+                st[:, t] = st[:, t-1]
+            
             # if (count < 2):
             #     Rt[:,:,t] = G @ Ct[:,:,t] @ G.T
             #     Rt[:,:,t] = Rt[:,:,t] + Rt[:,:,t] * delta
@@ -386,8 +399,6 @@ def FF_Bernoulli2(F, G, delta, zt, pr_prob, nt=[]):
                 
             mt[:,t+1] = at[:,t] 
             Ct[:,:,t+1] = Rt[:,:,t]
-            rt[:, t] = rt[:, t-1]
-            st[:, t] = st[:, t-1]
             skipped[:, t] = True
             
     return mt[:, 1:], Ct[:,:,1:], at, Rt, rt, st, skipped

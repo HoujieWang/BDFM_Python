@@ -217,9 +217,10 @@ def flow_counter2(loc_history, agent_id, region_bounds, cell_size, st_date, end_
 
 
 def flow_converger(data, nzones, distance = False, dist_mat=[], reverse = False):
-    # data = agent_location_i; nzones = 10
-    unique_nodes_i = np.unique(data)
+    # data = agent_location_i; nzones = 5
+    # unique_nodes_i = np.unique(data)
     flow_i = np.hstack((data[: -1, :], data[1:  , :]))
+    unique_nodes_i = np.unique(flow_i[:,0])
     unique_edges_i = np.unique(flow_i, axis = 0)
     flow_count_i = np.zeros((unique_edges_i.shape[0], data.shape[0]-1))
     for ii in range(unique_edges_i.shape[0]):
@@ -230,25 +231,27 @@ def flow_converger(data, nzones, distance = False, dist_mat=[], reverse = False)
     
     # This code ranks zones first by frequency of visit
     for i in range(len(unique_nodes_i)):
-        # i = 9
+        # i = 0
         node_i = unique_nodes_i[i]
         node_choices = np.zeros((node_order.shape[1]-1, ))-1
         end_nodes = unique_edges_i[unique_edges_i[:,0] == node_i,1]
+        Nend_nodes = len(end_nodes)
         n_visist = np.array([np.sum(flow_i[flow_i[:,0] == node_i, 1] == x) for x in end_nodes])
         nodes_to_order = [end_nodes[n_visist == -x] for x in np.sort(-np.unique(n_visist))]
         if(distance):
             end_nodes = np.concatenate([x[np.argsort(dist_mat[node_i,:][x])]  for x in nodes_to_order])
-            node_choices[:len(end_nodes)] = end_nodes
+            node_choices[:Nend_nodes] = end_nodes
             
             filling_choices = np.argsort(dist_mat[node_i, :])
             filling_choices = filling_choices[np.logical_not(np.isin(filling_choices, np.concatenate((np.array([node_i]), end_nodes))))]
             
-            node_choices[len(end_nodes):] = filling_choices[:(node_order.shape[1]-len(end_nodes)-1)]
+            node_choices[Nend_nodes:] = filling_choices[:(node_order.shape[1]-Nend_nodes-1)]
         else:
             end_nodes = np.concatenate(nodes_to_order)
             if reverse:
-                end_nodes = end_nodes[np.arange(len(end_nodes)-1, -1, -1)]
-            node_choices[:len(end_nodes)] = end_nodes
+                end_nodes = end_nodes[np.arange(Nend_nodes-1, -1, -1)]
+                
+            node_choices[:Nend_nodes] = end_nodes
         
         node_order[i,1:] = node_choices
     
