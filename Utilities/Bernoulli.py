@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 from scipy import special
 from scipy.special import polygamma
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, fsolve
 # def bern_eq(x, f, q):
 #     return np.concatenate([special.polygamma(0, x[0]) - special.polygamma(0, x[1])-f, 
 # special.polygamma(1, x[0]) + special.polygamma(1, x[1])-q])
@@ -11,6 +11,12 @@ def bern_eq(x, f, q):
     # x = np.array([1, 1]); f = all_f[i]; q = all_q[i]
     return np.array([special.polygamma(0, x[0]) - special.polygamma(0, x[1])-f, 
 special.polygamma(1, x[0]) + special.polygamma(1, x[1])-q])
+
+def bern_eq2(x, f, q):
+    # x = np.array([1, 1]); f = all_f[i]; q = all_q[i]
+    x = exp(x)
+    return np.array([special.polygamma(0, x[0]) - special.polygamma(0, x[1])-f, 
+                     special.polygamma(1, x[0]) + special.polygamma(1, x[1])-q])
 
 def dirichlet_eq(x, mu, sigma2, cov):
     return  np.concatenate((polygamma(0, x[1:]) - polygamma(0, x[0]) - mu, \
@@ -318,9 +324,8 @@ def Retro_sampling(TActual, F, G, mt, Ct, at, Rt, nSample, family, discount=[]):
 def FF_Bernoulli2(F, G, delta, zt, nt=[], pr_var = 0.1, no_data_update = False):
     if (len(nt) == 0): 
         nt=np.repeat(1, zt.shape[1])
-    # F = F_bern; G = G_bern; delta = delta_bern
-    # zt = trn_flow_i[[ii],:]
-    # pr_prob = 0.9
+    # F = F_ii; G = G_bern; delta = delta_bern
+    # zt =trn_flow_i[[ii],:]; pr_var = pr_var
     # Initiate: Bernoulli
     d1, d2 = G.shape
     TActual = zt.shape[1]
@@ -402,46 +407,102 @@ def FF_Bernoulli2(F, G, delta, zt, nt=[], pr_var = 0.1, no_data_update = False):
             skipped[:, t] = True
             
     return mt[:, 1:], Ct[:,:,1:], at, Rt, rt, st, skipped
-# def Retro_sampling2(TActual, F, G, mt, Ct, at, Rt, nSample, family):
-#     # TActual = 335; F=F_bern; G=G_bern; mt = mt_bern; Ct = Ct_bern;
-#     # at = at_bern; Rt = Rt_bern; skipped = skipped_bern; family = "poisson"
-#     # nSample =1000
-#     RA_samples = np.zeros((nSample, TActual))
-#     # Starting Seed
-#     d = G.shape[0]
-#     mt_star = mt[: ,(TActual - 1):TActual] @ np.ones((1, nSample))
-#     Ct_star = Ct[:,: ,TActual - 1]
-#     all_states = np.random.multivariate_normal(mean=np.zeros(d,), cov=Ct_star, \
-#                      size=nSample).T + mt_star
-#     if (family == "poisson"):
-#         RA_samples[:, -1] = np.exp(F.T @ all_states)
-#     if (family == "bernoulli"):
-#         RA_samples[:, -1] = scipy.special.expit(F.T @ all_states)
-        
-#     # Trajectory
-#     for t in np.arange(TActual-2, -1, -1):
-#         # t = 548
-        
-       
-        # Bt = Ct[:,:,t] @ G.T @ scipy.linalg.inv(Rt[:,:,t+1])
-        # mt_star = mt[:, t:(t+1)] @ np.ones((1, nSample)) + \
-        #             Bt @ (all_states - at[:,  t: (t + 1)] @ np.ones((1, nSample)))
-        # Ct_star = Ct[:, :, t] - Bt @ Rt[:, :, t + 1] @ Bt.T
 
-                   
-#         Ct_star = 0.5*(Ct_star + Ct_star.T)
-                 
-        
-        
-#         all_states = np.random.multivariate_normal(mean = np.zeros(d,), \
-#                                       cov = Ct_star, \
-#                                           size = nSample).T + mt_star
+# def FF_Bernoulli3(F, G, delta, zt, nt=[], pr_var = 0.1, no_data_update = False):
+#     if (len(nt) == 0): 
+#         nt=np.repeat(1, zt.shape[1])
+#     # F = F_bern; G = G_bern; delta = delta_bern
+#     # zt = trn_flow_i[[ii],:]
+#     # pr_prob = 0.9
+#     # Initiate: Bernoulli
+#     d1, d2 = G.shape
+#     TActual = zt.shape[1]
+#     mt  = np.zeros((d2,TActual+1))
+#     Ct  = np.zeros((d2,d2,TActual+1))
+#     at  = np.zeros((d1,TActual))
+#     Rt  = np.zeros((d1,d1,TActual))
+#     rt  = np.zeros((1,TActual))
+#     st  = np.zeros((1,TActual))
+#     ft  = np.zeros((1,TActual))
+#     qt  = np.zeros((1,TActual))
+#     sft = np.zeros((1,TActual))
+#     sqt = np.zeros((1,TActual))
+#     skipped = np.zeros((1,TActual))
+    
+#     # Prior: Bernoulli
+    
+    
+#     # a0 = np.concatenate([np.zeros((F.shape[0]-3, )), \
+#     #                       np.array([scipy.special.logit(pr_prob)]), \
+#     #                           np.zeros((F.shape[0]-3, ))])
+#     a0 = np.zeros((d2, ))
+#     mt[:, 0] = np.linalg.inv(G) @ a0
+#     Ct[:, :, 0] = pr_var*np.eye(d2)
+#     # Forward filtering: Bernoulli
+#     # count = 0
+#     for t in range(TActual):
+#         if (zt[:,t] >= 0): # If we have data for time t:
+#             # count = 0
+#             at[:,t]   = G @ mt[:,t]
+            
+#             Rt[:,:,t] = G @ Ct[:,:,t] @ G.T
+#             Rt[:,:,t] = Rt[:,:,t] + Rt[:,:,t] * delta
+            
 
-#         if (family == "poisson"):
-#             RA_samples[:, t] = np.exp(F.T @ all_states)
-#         if (family == "bernoulli"):
-#             RA_samples[:, t] = scipy.special.expit(F.T @ all_states)
+#             ft[:, t]     = F[:,t:(t+1)].T @ at[:,t]
+#             qt[:, t]     = F[:,t:(t+1)].T @ Rt[:,:,t] @ F[:,t:(t+1)]
             
+#             xnew = fsolve(bern_eq, np.array([[1],[1]]), args=(ft[0, t], qt[0, t]))
+#             xnew = np.exp(xnew)
+#             if (np.abs(bern_eq(xnew, ft[0, t], qt[0, t])) > 1e-2).any():
+#                 sol = least_squares(bern_eq, [1, 1], \
+#                                       args = (ft[0, t], qt[0, t]), \
+#                                       bounds = ((0, 0), (float("inf"), float("inf"))))
+                
+#                 xnew = sol.x
+#             rt[:,t]  = xnew[0]
+#             st[:,t]  = xnew[1]
             
-#     return(RA_samples)
+#             # Update ft, qt
+#             sft[:, t] = special.polygamma(0, rt[:, t] + zt[:, t]) - special.polygamma(0, st[:, t] + nt[t] - zt[:, t])
+#             sqt[:, t] = special.polygamma(1, rt[:, t] + zt[:, t]) + special.polygamma(1, st[:, t] + nt[t] - zt[:, t]);
+            
+#             # Posterior mt, Ct
+#             mt[:,t+1]   = at[:,t] + Rt[:,:,t] @ F[:,t:(t+1)] @ (sft[:, t]-ft[:, t]) / qt[:, t]
+#             Ct[:,:,t+1] = Rt[:,:,t] - Rt[:,:,t] @ F[:,t:(t+1)] @ F[:,t:(t+1)].T @ Rt[:,:,t] * (1 - sqt[:,t] / qt[:,t]) / qt[:,t]
+            
+#         else: 
+#             # count+=1
+#             at[:,t]   = G @ mt[:,t]
+#             Rt[:,:,t] = G @ Ct[:,:,t] @ G.T
+            
+#             if no_data_update:
+#                 ft[:, t]     = F[:,t:(t+1)].T @ at[:,t]
+#                 qt[:, t]     = F[:,t:(t+1)].T @ Rt[:,:,t] @ F[:,t:(t+1)]
+                
+#                 xnew = fsolve(bern_eq2, np.array([[1],[1]]), args=(ft[0, t], qt[0, t]))
+#                 xnew = np.exp(xnew)
+#                 if (np.abs(bern_eq(xnew, ft[0, t], qt[0, t])) > 1e-4).any():
+#                     sol = least_squares(bern_eq, [1, 1], \
+#                                           args = (ft[0, t], qt[0, t]), \
+#                                           bounds = ((0, 0), (float("inf"), float("inf"))))
+#                     xnew = sol.x
+#                 rt[:,t]  = xnew[0]
+#                 st[:,t]  = xnew[1]
+#             else:
+#                 rt[:, t] = rt[:, t-1]
+#                 st[:, t] = st[:, t-1]
+            
+#             # if (count < 2):
+#             #     Rt[:,:,t] = G @ Ct[:,:,t] @ G.T
+#             #     Rt[:,:,t] = Rt[:,:,t] + Rt[:,:,t] * delta
+#             # else:
+#             #     Rt[:,:,t] = Rt[:,:,t-1]
+                
+#             mt[:,t+1] = at[:,t] 
+#             Ct[:,:,t+1] = Rt[:,:,t]
+#             skipped[:, t] = True
+            
+#     return mt[:, 1:], Ct[:,:,1:], at, Rt, rt, st, skipped
+
 

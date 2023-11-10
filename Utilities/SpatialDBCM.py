@@ -35,12 +35,12 @@ def spatialDBCM(y, X=[], F = np.array([1, 1, 0]), \
         
     # y = y_i.reshape(-1, 1)
     # nSeries = nSeries
-    # nPeriod = 0
-    # X = [occu_ratio,100*trans_dist]
-    # F = np.array([1])
-    # delta = np.array([0.98, 0.98, 0.98])
+    # nPeriod = int(96/scale)
+    # X = [occu_ratio, 100*trans_dist, emp_trans_prob]
+    # F = np.array([1,1,0])
+    # delta = np.array([0.98, 0.98, 0.98, 0.98])
     # ed_time = []
-    
+    # pr_var = 0.1
     if len(ed_time) == 0:
         ed_time =y.shape[0]-1
     
@@ -138,8 +138,8 @@ def spatialDBCM(y, X=[], F = np.array([1, 1, 0]), \
                 
             next_zone_order = np.where(agent_location_i[t+1,0] == trn_next_zones)[0][0]
             if next_zone_order+1 > len(beta_parmRA):
-                
-                trans_probRA[t] = transition_probRA[-1] / (len(unique_nodes_i) - len(beta_parmRA))
+                # transition prob. to the other zones
+                trans_probRA[t] = transition_probRA[-1]
             else:
                 trans_probRA[t] = transition_probRA[next_zone_order]
             

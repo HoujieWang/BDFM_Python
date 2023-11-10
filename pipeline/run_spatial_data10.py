@@ -22,6 +22,7 @@ from scipy.sparse import csr_matrix
 import pyarrow
 import pickle
 import datetime
+import ast
 from pyspark import SparkContext, SparkConf
 ############################## Prepare the Data ###############################
 occupancy_counts = scipy.sparse.load_npz('occupancy_counts.npz')
@@ -61,6 +62,8 @@ agent_location = np.array([np.array(x.space_bin[np.arange(0, x.shape[0], \
                                                           np.sum(x.time_bin == 0))])\
                            for x in all_agent_df])
 
+
+    
 nei_zones[nei_zones > Nzones] = Nzones
 nei_zones = np.vstack((nei_zones, np.repeat(Nzones, nei_zones.shape[1]))).astype(int)
 
